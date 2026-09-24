@@ -114,15 +114,19 @@ export function monthSummary(state, year, month, today) {
     .sort((a, b) => b.spent + b.pending - (a.spent + a.pending));
 
   const days = {};
-  for (let d = 1; d <= dim; d++) days[toISO(new Date(year, month, d))] = { spend: 0, income: 0, events: [], txns: [] };
+  // flex = day-to-day spending, excluding bills/debt payments already shown as calendar events.
+  const billTxns = new Set(occurrences.map((o) => o.matchedTxnId).filter(Boolean));
+  for (let d = 1; d <= dim; d++) days[toISO(new Date(year, month, d))] = { spend: 0, flex: 0, income: 0, events: [], txns: [] };
   for (const t of txns) {
     const day = days[t.date];
     if (!day) continue;
     day.txns.push(t);
     const type = typeOf(t);
     if (type === 'transfer') continue;
-    if (t.amount < 0) day.spend += -t.amount;
-    else if (type === 'income') day.income += t.amount;
+    if (t.amount < 0) {
+      day.spend += -t.amount;
+      if (!billTxns.has(t.id) && type !== 'savings') day.flex += -t.amount;
+    } else if (type === 'income') day.income += t.amount;
   }
   for (const o of occurrences) days[o.date]?.events.push(o);
 

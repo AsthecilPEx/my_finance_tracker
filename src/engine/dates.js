@@ -70,6 +70,11 @@ export function shortDate(iso) {
   return parseISO(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+export function ordinal(n) {
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
+  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'}`;
+}
+
 export function weekdayShort(iso) {
   return parseISO(iso).toLocaleDateString('en-GB', { weekday: 'short' });
 }

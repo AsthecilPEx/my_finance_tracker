@@ -1,5 +1,6 @@
 import { DEFAULT_CATEGORIES, categorise, merchantKey } from './categories.js';
 import { round2 } from './money.js';
+import { daysBetween } from './dates.js';
 
 export const STATE_VERSION = 1;
 
@@ -54,10 +55,26 @@ function importKey(row) {
  * Identical rows on the same day (e.g. two coffees) are kept apart by an occurrence counter,
  * so re-importing an overlapping statement never double-counts.
  * Bank-synced rows carry an externalId and are de-duplicated by that instead.
+ * The same payment arriving from a different source (e.g. a CSV and then the bank feed,
+ * which word descriptions differently) is matched on amount and date within a day.
  */
 export function mergeRows(state, rows, source, { fileName } = {}) {
   const existing = new Set(state.transactions.map((t) => t.importKey).filter(Boolean));
   const external = new Set(state.transactions.map((t) => t.externalId).filter(Boolean));
+  const byAmount = new Map();
+  for (const t of state.transactions) {
+    if (t.source === source) continue;
+    const k = round2(t.amount).toFixed(2);
+    if (!byAmount.has(k)) byAmount.set(k, []);
+    byAmount.get(k).push(t);
+  }
+  const claimed = new Set();
+  const crossSourceMatch = (row) => {
+    const candidates = byAmount.get(round2(row.amount).toFixed(2)) || [];
+    const hit = candidates.find((t) => !claimed.has(t.id) && Math.abs(daysBetween(t.date, row.date)) <= 1);
+    if (hit) claimed.add(hit.id);
+    return hit;
+  };
   const seen = new Map();
   const added = [];
   let duplicates = 0;
@@ -67,7 +84,7 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
     const n = (seen.get(base) || 0) + 1;
     seen.set(base, n);
     const key = `${base}#${n}`;
-    if (existing.has(key)) { duplicates++; continue; }
+    if (existing.has(key) || crossSourceMatch(row)) { duplicates++; continue; }
     added.push({
       id: newId(),
       date: row.date,

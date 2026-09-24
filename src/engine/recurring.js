@@ -189,9 +189,10 @@ export function detectRecurring(transactions, existing = [], userRules = []) {
     const spread = Math.max(...amounts.map((a) => Math.abs(a - medAmt))) / medAmt;
     if (spread > 0.25) continue;
     const merchant = key.split('|')[0];
-    if (tracked.some((w) => merchant.includes(w) || w.includes(merchant))) continue;
-
     const last = txns[txns.length - 1];
+    const lastDesc = (last.description || '').toLowerCase();
+    if (tracked.some((w) => merchant.includes(w) || w.includes(merchant) || w.split(/[,|]/).some((x) => x.trim() && lastDesc.includes(x.trim())))) continue;
+
     const direction = last.amount < 0 ? 'out' : 'in';
     const categoryId = last.categoryId || categorise(last.description, last.amount, userRules);
     const days = txns.map((t) => parseISO(t.date).getDate());

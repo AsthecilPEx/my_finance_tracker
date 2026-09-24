@@ -74,6 +74,18 @@ describe('statement import', () => {
   });
 });
 
+describe('cross-source de-duplication', () => {
+  it('does not double count a payment imported by CSV and then synced from the bank', () => {
+    let s = mergeRows(createEmptyState(), [{ date: '2026-09-02', amount: -23.4, description: 'TESCO STORES 2841' }], 'csv').state;
+    const r = mergeRows(s, [
+      { date: '2026-09-03', amount: -23.4, description: 'Tesco', externalId: 'b1' },
+      { date: '2026-09-03', amount: -9.99, description: 'Boots', externalId: 'b2' },
+    ], 'bank');
+    expect(r.added).toBe(1);
+    expect(r.duplicates).toBe(1);
+  });
+});
+
 describe('categorisation', () => {
   it('recognises UK merchants', () => {
     expect(categorise('TESCO STORES 2841', -20)).toBe('groceries');

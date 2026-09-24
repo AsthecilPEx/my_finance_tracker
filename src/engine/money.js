@@ -6,7 +6,7 @@ export const CURRENCIES = {
 export function formatMoney(amount, currency = 'GBP', { sign = false, decimals } = {}) {
   const cfg = CURRENCIES[currency] || CURRENCIES.GBP;
   const abs = Math.abs(amount || 0);
-  const digits = decimals ?? (abs >= 1000 ? 0 : 2);
+  const digits = decimals ?? (abs >= 1000 || Number.isInteger(Math.round(abs * 100) / 100) ? 0 : 2);
   const body = new Intl.NumberFormat(cfg.locale, {
     style: 'currency',
     currency,
