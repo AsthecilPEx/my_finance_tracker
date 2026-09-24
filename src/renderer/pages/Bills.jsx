@@ -4,8 +4,9 @@ import Modal from '../components/Modal.jsx';
 import { RecurringForm } from '../components/Forms.jsx';
 import { detectRecurring, FREQUENCIES, monthlyEquivalent, nextOccurrence } from '../../engine/recurring.js';
 import { shortDate, weekdayShort, daysBetween, ordinal } from '../../engine/dates.js';
+import { profileSummary, describeSchedule, incomeItems } from '../../engine/income.js';
 
-export default function Bills() {
+export default function Bills({ go }) {
   const { state, dispatch, fmt, today, cats, notify } = useApp();
   const [edit, setEdit] = useState(null);
   const [dismissed, setDismissed] = useState([]);
@@ -24,7 +25,9 @@ export default function Bills() {
   ];
   const active = (r) => r.active !== false;
   const total = (list) => list.filter(active).reduce((s, r) => s + r.monthly, 0);
-  const inTotal = total(groups[0].items);
+  const prof = profileSummary(state);
+  const payItems = incomeItems(state);
+  const inTotal = total(groups[0].items) + prof.monthly;
   const mustTotal = total(groups[1].items) + state.debts.filter((d) => d.balance > 0).reduce((s, d) => s + (d.minPayment || 0), 0);
   const optTotal = total(groups[2].items);
 
@@ -67,8 +70,23 @@ export default function Bills() {
 
       {groups.map((g) => (
         <div key={g.id} className="card">
-          <div className="card-head"><h3>{g.title}</h3>{g.hint && <span className="muted sm">{g.hint}</span>}</div>
-          {g.items.length === 0 ? <p className="empty">Nothing here yet.</p> : (
+          <div className="card-head"><h3>{g.title}</h3>{g.hint && <span className="muted sm">{g.hint}</span>}{g.id === 'in' && <button className="btn ghost sm" onClick={() => go('settings')}>Edit my pay</button>}</div>
+          {g.id === 'in' && prof.sources.length > 0 && (
+            <ul className="list">
+              {prof.sources.map((p) => {
+                const item = payItems.find((i) => i.incomeId === p.inc.id);
+                const next = item ? nextOccurrence(item, today, state.settings.extraHolidays) : null;
+                return (
+                  <li key={p.inc.id} className="list-row">
+                    <span aria-hidden>💼</span>
+                    <span className="grow"><b>{p.inc.name}</b><small className="muted"> · {describeSchedule(p.inc.schedule)}{next ? ` · next ${weekdayShort(next)} ${shortDate(next)}` : ''} · from your pay profile</small></span>
+                    <b className="pos">{fmt(p.plannedPerPay)}</b>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {g.items.length === 0 && g.id === 'in' && prof.sources.length ? null : g.items.length === 0 ? <p className="empty">Nothing here yet.</p> : (
             <ul className="list">
               {g.items.map((r) => (
                 <li key={r.id} className={`list-row ${active(r) ? '' : 'inactive'}`}>

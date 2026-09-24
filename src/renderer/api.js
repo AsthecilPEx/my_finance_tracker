@@ -50,6 +50,33 @@ export const api = desktop || {
   },
   onState: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
   openCsvFile: () => pickFile('.csv,text/csv'),
+  copyText: async (text) => navigator.clipboard.writeText(text),
+  saveText: async (text, name) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = name;
+    a.click();
+  },
+  onNavigate: () => () => {},
+  receipts: {
+    // In the browser the photo is kept as a data URL; OCR needs the desktop app.
+    pickImage: () => new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = () => {
+        const f = input.files?.[0];
+        if (!f) return resolve(null);
+        const r = new FileReader();
+        r.onload = () => resolve({ file: r.result, dataUrl: r.result });
+        r.readAsDataURL(f);
+      };
+      input.click();
+    }),
+    ocr: unsupported,
+    image: async (file) => file,
+  },
+  plan: { openFile: () => pickFile('.json,.txt,.md,text/plain') },
   exportBackup: async (state) => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -69,8 +96,10 @@ export const api = desktop || {
   openMain: async () => {},
   openExternal: async (url) => window.open(url, '_blank'),
   bank: {
+    info: async () => ({ hasCredentials: false, redirectUrl: '' }),
+    pickKey: unsupported,
+    completeWithUrl: unsupported,
     saveCredentials: unsupported,
-    hasCredentials: async () => false,
     institutions: unsupported,
     connect: unsupported,
     sync: unsupported,

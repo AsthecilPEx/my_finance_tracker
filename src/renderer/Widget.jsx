@@ -5,6 +5,7 @@ import Ring from './components/Ring.jsx';
 import { EVENT_TYPES } from './components/events.js';
 import { monthSummary, upcoming } from '../engine/summary.js';
 import { parseISO, shortDate } from '../engine/dates.js';
+import { evaluateCaps } from '../engine/caps.js';
 
 // Compact always-available card for the Windows desktop.
 export default function Widget() {
@@ -15,6 +16,7 @@ export default function Widget() {
   const used = s.spent + s.saved + s.committedPending;
   const color = s.leftToSpend < 0 ? 'var(--critical)' : s.income && s.leftToSpend / s.income < 0.1 ? 'var(--warning)' : 'var(--good)';
   const top = s.byCategory.filter((c) => c.type === 'lifestyle').slice(0, 4);
+  const cap = useMemo(() => evaluateCaps(state, today).filter((c) => c.status !== 'ok').sort((a, b) => b.pct - a.pct)[0], [state, today]);
 
   return (
     <div className="widget" style={{ opacity: state.settings.widget.opacity }}>
@@ -35,6 +37,7 @@ export default function Widget() {
           <div><span>📉 Spent</span><b>{fmt(s.spent, { decimals: 0 })}</b></div>
         </div>
       </div>
+      {cap && <div className={`widget-cap ${cap.status}`}>{cap.status === 'over' ? '⚠' : '◐'} {cap.label}: {fmt(cap.spent, { decimals: 0 })} / {fmt(cap.cap.amount, { decimals: 0 })}</div>}
       <div className="widget-bars">
         {top.map((c) => (
           <div key={c.id} className="wbar">

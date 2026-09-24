@@ -1,8 +1,10 @@
 import { DEFAULT_CATEGORIES, categorise, merchantKey } from './categories.js';
 import { round2 } from './money.js';
 import { daysBetween } from './dates.js';
+import { normaliseItem } from './receipts.js';
+import { applyPlan, undoPlan } from './aiplan.js';
 
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 
 export function createEmptyState() {
   return {
@@ -17,9 +19,13 @@ export function createEmptyState() {
       watchFolder: '',
       watchEnabled: false,
       widget: { pinned: true, opacity: 0.96 },
-      bank: { connected: false, institutionId: '', institutionName: '', requisitionId: '', accounts: [], lastSync: null, autoSync: true },
+      bank: { provider: 'enablebanking', connected: false, institutionId: '', institutionName: '', sessionId: '', accounts: [], lastSync: null, autoSync: true },
+      billPot: { enabled: true, balance: 0 },
+      debtPlan: { strategy: 'avalanche', extra: 100 },
+      receiptPrompts: true,
       extraHolidays: [],
     },
+    profile: { name: '', region: 'ruk', incomes: [] },
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
     transactions: [],
     recurring: [],
@@ -27,6 +33,15 @@ export function createEmptyState() {
     rules: [],
     accounts: [],
     imports: [],
+    receipts: [],
+    receiptSkips: [],
+    itemRules: {},
+    caps: [],
+    goals: [],
+    planHistory: [],
+    // Reserved for V3 (brokerage, crypto, SIP/SWP connectors). Kept in the schema so data
+    // written by later versions survives a round trip through this one.
+    portfolio: { holdings: [], connectors: [] },
   };
 }
 
@@ -37,6 +52,11 @@ export function migrate(state) {
   const merged = { ...base, ...state, settings: { ...base.settings, ...(state.settings || {}) } };
   merged.settings.widget = { ...base.settings.widget, ...(state.settings?.widget || {}) };
   merged.settings.bank = { ...base.settings.bank, ...(state.settings?.bank || {}) };
+  merged.settings.billPot = { ...base.settings.billPot, ...(state.settings?.billPot || {}) };
+  merged.profile = { ...base.profile, ...(state.profile || {}) };
+  if (!merged.profile.name && state.settings?.name) merged.profile.name = state.settings.name;
+  // v1 -> v2: older GoCardless connections can't be resumed (the service is closing).
+  if (state.settings?.bank && state.settings.bank.provider !== 'enablebanking') merged.settings.bank = { ...base.settings.bank };
   const have = new Set((merged.categories || []).map((c) => c.id));
   merged.categories = [...(merged.categories || []), ...base.categories.filter((c) => !have.has(c.id))];
   merged.version = STATE_VERSION;
@@ -170,6 +190,40 @@ export function reduce(state, action) {
       };
     case 'rule/delete':
       return { ...state, rules: state.rules.filter((r) => r.id !== p.id) };
+
+    case 'profile/update':
+      return { ...state, profile: { ...state.profile, ...p } };
+    case 'income/save':
+      return { ...state, profile: { ...state.profile, incomes: upsert(state.profile.incomes || [], p) } };
+    case 'income/delete':
+      return { ...state, profile: { ...state.profile, incomes: (state.profile.incomes || []).filter((i) => i.id !== p.id) } };
+
+    case 'receipt/save': {
+      // Remember how the user rated each item so the next receipt is pre-filled.
+      const itemRules = { ...(state.itemRules || {}) };
+      for (const it of p.items || []) if (it.name && it.tier) itemRules[normaliseItem(it.name)] = { tier: it.tier, section: it.section };
+      return { ...state, itemRules, receipts: upsert(state.receipts || [], { createdAt: new Date().toISOString(), ...p }) };
+    }
+    case 'receipt/delete':
+      return { ...state, receipts: (state.receipts || []).filter((r) => r.id !== p.id) };
+    case 'receipt/skip':
+      return { ...state, receiptSkips: [...new Set([...(state.receiptSkips || []), ...(p.ids || [p.txnId])])].slice(-2000) };
+
+    case 'cap/save':
+      return { ...state, caps: upsert(state.caps || [], { active: true, alertAt: 0.8, period: 'month', ...p, amount: round2(+p.amount || 0) }) };
+    case 'cap/delete':
+      return { ...state, caps: (state.caps || []).filter((c) => c.id !== p.id) };
+    case 'goal/save':
+      return { ...state, goals: upsert(state.goals || [], { active: true, saved: 0, ...p }) };
+    case 'goal/delete':
+      return { ...state, goals: (state.goals || []).filter((g) => g.id !== p.id) };
+    case 'goal/contribute':
+      return { ...state, goals: (state.goals || []).map((g) => (g.id === p.id ? { ...g, saved: round2((g.saved || 0) + (+p.amount || 0)) } : g)) };
+
+    case 'plan/apply':
+      return applyPlan(state, p.plan, p.selected, newId);
+    case 'plan/undo':
+      return undoPlan(state, p.id);
 
     case 'accounts/set':
       return { ...state, accounts: p };

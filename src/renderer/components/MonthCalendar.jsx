@@ -33,8 +33,10 @@ export default function MonthCalendar({ summary, selected, onSelect }) {
             onClick={() => onSelect(iso)}
             title={tip || undefined}
           >
-            <span className="cal-num">{parseISO(iso).getDate()}</span>
-            {payday && <span className="payday-tag">PAYDAY</span>}
+            <span className="cal-top">
+              <span className="cal-num">{parseISO(iso).getDate()}</span>
+              {payday && <span className="payday-tag">PAY</span>}
+            </span>
             <span className="cal-chips">
               {shown.map((e) => {
                 const t = EVENT_TYPES[e.type];

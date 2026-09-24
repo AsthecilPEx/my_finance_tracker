@@ -13,7 +13,8 @@ function payoffDate(today, months) {
 export default function Debts() {
   const { state, dispatch, fmt, today } = useApp();
   const [edit, setEdit] = useState(null);
-  const [extra, setExtra] = useState(100);
+  const [extra, setExtra] = useState(state.settings.debtPlan?.extra ?? 100);
+  const chosen = state.settings.debtPlan?.strategy || 'avalanche';
   const debts = state.debts.filter((d) => d.balance > 0);
   const total = debts.reduce((s, d) => s + d.balance, 0);
   const minTotal = debts.reduce((s, d) => s + (d.minPayment || 0), 0);
@@ -83,7 +84,7 @@ export default function Debts() {
               const best = plans.avalanche.totalInterest <= plans.snowball.totalInterest ? 'avalanche' : 'snowball';
               return (
                 <div key={p.key} className={`plan ${best === p.key ? 'best' : ''}`}>
-                  <div className="plan-head"><h4>{p.name}</h4>{best === p.key && <span className="badge done">✓ Cheapest</span>}</div>
+                  <div className="plan-head"><h4>{p.name}</h4><span>{best === p.key && <span className="badge done">✓ Cheapest</span>} {chosen === p.key ? <span className="badge must">Your plan</span> : <button className="btn ghost sm" onClick={() => dispatch({ type: 'settings/update', payload: { debtPlan: { strategy: p.key, extra } } })}>Use this</button>}</span></div>
                   <p className="muted sm">{p.desc}</p>
                   <div className="plan-stats">
                     <div><span>Debt-free</span><b>{payoffDate(today, r.months)}</b></div>

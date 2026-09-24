@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from './store.jsx';
 import { api, isDesktop } from './api.js';
 import Modal from './components/Modal.jsx';
@@ -11,22 +11,32 @@ import Debts from './pages/Debts.jsx';
 import Insights from './pages/Insights.jsx';
 import Budgets from './pages/Budgets.jsx';
 import Connect from './pages/Connect.jsx';
+import Planner from './pages/Planner.jsx';
+import Receipts from './pages/Receipts.jsx';
+import AIPlan from './pages/AIPlan.jsx';
+import { receiptInbox } from '../engine/receipts.js';
 import Settings from './pages/Settings.jsx';
 
 const PAGES = [
   { id: 'dashboard', label: 'Dashboard', icon: '◉', Component: Dashboard },
+  { id: 'planner', label: 'Pay Planner', icon: '⇶', Component: Planner },
   { id: 'insights', label: 'Insights', icon: '✦', Component: Insights },
+  { id: 'receipts', label: 'Receipts', icon: '🧾', Component: Receipts },
   { id: 'transactions', label: 'Transactions', icon: '≡', Component: Transactions },
   { id: 'bills', label: 'Bills & Income', icon: '↻', Component: Bills },
   { id: 'debts', label: 'Debts & Loans', icon: '◔', Component: Debts },
-  { id: 'budgets', label: 'Budgets', icon: '◎', Component: Budgets },
-  { id: 'connect', label: 'Import & Sync', icon: '⇅', Component: Connect },
+  { id: 'budgets', label: 'Budgets & Caps', icon: '◎', Component: Budgets },
+  { id: 'ai', label: 'AI Plan', icon: '✧', Component: AIPlan },
+  { id: 'connect', label: 'Bank Sync', icon: '⇅', Component: Connect },
   { id: 'settings', label: 'Settings', icon: '⚙', Component: Settings },
 ];
 
 export default function App() {
-  const { state, toast } = useApp();
+  const { state, toast, today } = useApp();
   const [page, setPage] = useState('dashboard');
+  const inboxCount = state.settings.receiptPrompts === false ? 0 : receiptInbox(state, today).length;
+  // The main process can ask us to open a page (e.g. from a notification click).
+  useEffect(() => api.onNavigate?.((p) => PAGES.some((x) => x.id === p) && setPage(p)), []);
   const [adding, setAdding] = useState(false);
 
   if (!state.settings.onboarded) return <Onboarding />;
@@ -39,6 +49,7 @@ export default function App() {
         {PAGES.map((p) => (
           <button key={p.id} className={`nav ${page === p.id ? 'active' : ''}`} onClick={() => setPage(p.id)}>
             <span className="nav-icon" aria-hidden>{p.icon}</span>{p.label}
+            {p.id === 'receipts' && inboxCount > 0 && <span className="nav-badge" aria-label={`${inboxCount} to itemise`}>{inboxCount}</span>}
           </button>
         ))}
         <div className="sidebar-foot">

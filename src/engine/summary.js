@@ -3,14 +3,20 @@ import { occurrencesBetween, matchOccurrences, nextOccurrence } from './recurrin
 import { categoryMap, SPENDING_TYPES } from './categories.js';
 import { round2, sum } from './money.js';
 import { monthlyInterest } from './debt.js';
+import { incomeItems } from './income.js';
 
-const KIND_TO_TYPE = { salary: 'payday', income: 'income', bill: 'bill', subscription: 'subscription', savings: 'savings', other: 'bill' };
+/** Recurring bills plus paydays generated from the pay profile. */
+export function scheduleItems(state) {
+  return [...(state.recurring || []), ...incomeItems(state)];
+}
+
+const KIND_TO_TYPE = { salary: 'payday', income: 'income', bill: 'bill', subscription: 'subscription', savings: 'savings', investment: 'savings', other: 'bill' };
 
 /** Expected money events (paydays, bills, subscriptions, debt payments) between two dates. */
 export function buildOccurrences(state, from, to) {
   const holidays = state.settings?.extraHolidays;
   const out = [];
-  for (const r of state.recurring || []) {
+  for (const r of scheduleItems(state)) {
     if (r.active === false) continue;
     for (const date of occurrencesBetween(r, from, to, holidays)) {
       out.push({
@@ -130,7 +136,7 @@ export function monthSummary(state, year, month, today) {
   }
   for (const o of occurrences) days[o.date]?.events.push(o);
 
-  const salaryItems = (state.recurring || []).filter((r) => r.active !== false && r.kind === 'salary');
+  const salaryItems = scheduleItems(state).filter((r) => r.active !== false && r.kind === 'salary');
   const paydays = salaryItems.map((r) => ({ r, date: nextOccurrence(r, today, state.settings?.extraHolidays) })).filter((p) => p.date);
   paydays.sort((a, b) => a.date.localeCompare(b.date));
   const nextPayday = paydays[0] ? { date: paydays[0].date, name: paydays[0].r.name, amount: paydays[0].r.amount, inDays: daysBetween(today, paydays[0].date) } : null;

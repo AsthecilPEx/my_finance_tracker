@@ -1,94 +1,90 @@
 # Pulse Finance
 
-A personal finance tracker for Windows that works like a fitness tracker for your money. The dashboard is dark, with glowing category meters and a payday calendar. It keeps track of bills, loans and subscriptions, and an insights engine tells you where you can cut back.
+A friendly personal finance app for Windows, built around **your** paydays. You might be paid monthly, weekly every Friday, every other week, on the last working day, or whenever the work comes in. Pulse turns that into a calendar, a steady spending allowance, and bills that never catch you out.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-## What it does
+## Highlights
 
 | | |
 |---|---|
-| **Dashboard** | A large "left to spend" ring (*Income − Spent − Bills still to pay = Left*), laid out like MyFitnessPal's calories-remaining screen. Below it are bright meters for each category, measured against your budget or your 3-month average. Stat tiles show days until payday, how much is safe to spend per day, and your total debt. |
-| **Payday calendar** | A month grid from the 1st to the 30th/31st. Colours and icons mark paydays (glowing green), money in, bills, subscriptions, debt payments and savings. A bar under each day shows day-to-day spending. Paid items get a ✓, and bills not yet seen on a statement are outlined. Click any day for the details. |
-| **Paydays done properly** | Pay on a fixed date, the last working day, or every 4 weeks. Weekends and **England & Wales bank holidays** are handled, so the 25th falling on a Sunday means you're paid on Friday the 23rd. |
-| **Bills & Income** | Recurring payments grouped as **compulsory** (rent, council tax, utilities) or **optional** (subscriptions you could cancel). The app finds these in your statements automatically and suggests tracking them. |
-| **Debts & Loans** | Credit cards, loans, car finance, BNPL and money owed to people. Shows interest cost and progress bars, plus an **avalanche vs snowball** payoff plan with a slider for extra monthly payments. |
-| **Insights** | Spending-pace warnings ("Eating Out is running 45% above usual"), budget overruns, price rises on subscriptions, streaming overlap, frequent small purchases (the "latte factor"), payday spending spikes, unusually large purchases, savings rate, the 50/30/20 check, interest-cost tips, 6-month trends and top merchants. |
-| **Desktop widget** | A small frameless card you can drag anywhere on the desktop. It shows your left-to-spend ring, payday countdown, top category bars and the next bills. It can stay on top of other windows, and its opacity is adjustable. |
-| **Tray and reminders** | Keeps running in the system tray and sends Windows notifications for bills due tomorrow, payday, and bank consent about to expire. It can start with Windows. |
+| **A personal setup wizard** | Five short steps: your name and tax region, how you're paid, your regular bills, a safety net, and a personalised summary. Anything can be changed later in **Settings → Profile & Pay**. |
+| **Real UK take-home pay** | Enter a salary, an hourly rate or a known take-home amount. Pulse applies your **tax code** (1257L, BR, D0, K-codes, NT, S-prefix), **Scottish bands**, **National Insurance**, **pension** (net pay, salary sacrifice or relief at source), **student loans** (Plans 1, 2, 4 and 5, and Postgrad) and any other deductions. You see the payslip-style breakdown update live as you type. |
+| **Every pay pattern** | Monthly on a set date (moved earlier for weekends and bank holidays), the last working day, the last Friday (or any weekday) of the month, weekly, fortnightly, four-weekly, or irregular. Add as many incomes as you have; each gets its own paydays on the calendar. |
+| **Built for irregular pay** | Tick "my pay changes" and Pulse plans on your **lowest** typical pay. The **Pay Planner** gives each payday a routine: move £X to your bills pot, £Y to goals, keep the rest. It spreads monthly bills across weekly or fortnightly pay in proportion to each payday's size, and works out the **smallest starting buffer** that keeps every bill paid. It also gives a **steady daily spending allowance**, flags weeks that would be short without the pot, and lists months with an **extra payday** so you can bank the bonus. |
+| **Receipts and item importance** | When a supermarket or shopping payment comes in (Aldi, Lidl, Tesco and so on), Pulse offers to itemise it. Snap a **photo of the receipt**, read by OCR **fully offline** on your PC, or type lines like `milk 1.45` / `2 x chicken @ 2.85`. Each item is rated **Essential**, **Moderately important** or **Not so important**, and put in a **Groceries**, **General** or **Food out** section. Pulse learns from your choices, then shows monthly trends by importance and your top "not so important" buys. |
+| **Spend caps with alerts** | Cap a category, an importance tier ("not-so-important groceries ≤ £30/month"), a receipt section or all spending, **per month, week or pay period**. Pulse warns you on the dashboard, the widget and through Windows notifications when you reach a threshold you choose, and again when you go over. |
+| **AI plan: bring your own assistant** | Copy a ready-made prompt with an anonymised summary of your finances into ChatGPT, Claude, Gemini or Copilot. Its reply contains a strict **Pulse Plan** JSON. Paste it back: Pulse validates it, shows every change with a checkbox (budgets, caps, savings goals, debt strategy, subscriptions to pause, bills pot), applies only what you tick, and keeps an **undo** history. |
+| **Everything from v1** | Glowing category meters, payday calendar, bills (compulsory vs optional), auto-detected subscriptions, debts with avalanche/snowball planning, insights, desktop widget, tray and reminders. |
 
 <p>
-  <img src="docs/screenshots/insights.png" width="49%" alt="Insights" />
-  <img src="docs/screenshots/debts.png" width="49%" alt="Debts" />
+  <img src="docs/screenshots/onboarding-pay.png" width="49%" alt="Pay setup with live take-home" />
+  <img src="docs/screenshots/planner.png" width="49%" alt="Pay Planner" />
 </p>
 <p>
-  <img src="docs/screenshots/bills.png" width="70%" alt="Bills" />
-  <img src="docs/screenshots/widget.png" width="26%" alt="Desktop widget" />
+  <img src="docs/screenshots/receipt.png" width="49%" alt="Itemising a receipt" />
+  <img src="docs/screenshots/receipts.png" width="49%" alt="Receipts and importance trends" />
 </p>
+<p>
+  <img src="docs/screenshots/ai-plan.png" width="49%" alt="AI plan preview" />
+  <img src="docs/screenshots/caps.png" width="49%" alt="Spend caps" />
+</p>
+<p><img src="docs/screenshots/widget.png" width="26%" alt="Desktop widget" /></p>
 
-## Getting transactions in (all read-only)
+## Getting transactions in (read-only)
 
-1. **CSV import.** Handles statement exports from Monzo, Starling, Revolut, Barclays, HSBC, Lloyds/Halifax, Nationwide, Santander, NatWest, Chase UK, Amex and most EU banks. It reads UK day-first dates, `£1,234.56` and European `1.234,56` amounts, split paid-in/paid-out columns, and header rows below preamble lines. Overlapping statements never create duplicates.
-2. **Auto-import folder.** Point the app at a folder. Any bank CSV saved there is imported and categorised within seconds, even while the app is in the tray. Files that aren't bank statements are ignored.
-3. **Open Banking.** Connects to your bank through [GoCardless Bank Account Data](https://bankaccountdata.gocardless.com/) (formerly Nordigen), a regulated UK/EU account-information service. The access is **read-only by law**: balances and transactions only, never payments. Your bank asks you to re-approve every 90 days, and the app syncs up to 4 times a day. You bring your own free API keys, which are stored encrypted with Windows DPAPI. When a bank is connected, "safe to spend" uses your real balance.
-   > GoCardless has changed its sign-up availability in the past. If new accounts aren't being accepted, options 1 and 2 still work fully, and the connector (`electron/openbanking.js`) is self-contained, so another provider (TrueLayer, Yapily, Plaid UK) can replace it.
+1. **Bank connection (Open Banking), recommended.** Pulse connects through **[Enable Banking](https://enablebanking.com/)**, a regulated provider covering 2,500+ UK and EU banks. It's free for personal use in *restricted* mode, where you link your own accounts to your own app. The access is read-only by law, and Pulse syncs up to 4 times a day. Your application key is encrypted with Windows DPAPI.
+   - Setup: create an application at enablebanking.com, add the redirect URL `http://localhost:47285/callback`, download the `.pem` key, link your accounts in their control panel, then enter the App ID and key in **Bank Sync**. If your bank sends you back to a page that doesn't load, paste its address into Pulse and it will finish the connection.
+   - *Why not GoCardless?* GoCardless Bank Account Data (formerly Nordigen) stopped accepting new sign-ups in July 2025 and is being wound down, so v0.2 replaces it.
+2. **Watched folder.** Any bank CSV saved to a folder you choose is imported automatically, even while Pulse is in the tray.
+3. **Statement file.** Import a CSV by hand, from almost any UK/EU bank.
 
-Transactions are auto-categorised using a list of UK merchants (Tesco, TfL, Octopus, Deliveroo, Netflix…). When you change a transaction's category, the app **learns** that merchant and re-files its other transactions.
+These fallbacks stay because Open Banking depends on a third party and on each bank's consent rules. They live under *Bank Sync → Other ways*, out of the everyday flow. The same payment arriving by two routes is de-duplicated.
 
 ## Install and run
 
-**Download the installer:** every push to `main` runs the GitHub Actions workflow *Build Windows app*, which uploads `Pulse Finance Setup x.y.z.exe` (installer) and a portable `.exe` as build artifacts.
-
-**Build it yourself on Windows** (Node.js 20+):
+Every push to `main` and every pull request runs the *Build Windows app* workflow, which uploads the installer and a portable `.exe` as build artifacts. To build it yourself on Windows (Node.js 20+):
 
 ```bash
 npm install
-npm start          # build the UI and launch the app
-npm run dist       # create the Windows installer in release/
+npm start          # build the UI and launch
+npm run dist       # Windows installer + portable exe in release/
+npm test           # 37 engine and connector tests
+npm run dev        # hot-reload development
 ```
 
-**Development:**
-
-```bash
-npm run dev        # Vite dev server + Electron with hot reload
-npm run dev:web    # UI only, in a browser (data saved in localStorage)
-npm test           # engine unit tests
-```
-
-On first launch, choose **Explore with demo data** to see every screen populated, or **Set up my finances** to enter your pay and rent. Reset the demo data in Settings.
-
-## Your data
+## Your data and privacy
 
 Everything stays on your PC in `%APPDATA%\Pulse Finance\`:
 
-- `pulse-data.json`: your data. Written atomically, with a daily backup kept for 14 days in `backups\`. If the file is ever damaged, the latest backup is restored automatically.
-- `secrets.json`: Open Banking keys, encrypted with Windows DPAPI.
-- Export and restore a full backup from Settings.
+- `pulse-data.json`: your data, written atomically, with daily backups kept for 14 days and automatic recovery.
+- `receipts\`: your receipt photos. OCR runs locally, and the English model ships with the app.
+- `secrets.json`: bank keys, encrypted with DPAPI.
+
+The AI prompt contains a summary (pay, bills, debts, category averages, caps, goals). It **leaves out** your name, account details and individual transactions. Nothing is sent anywhere unless you paste it yourself.
 
 ## How it's built
 
 ```
-src/engine/      Pure JS core, shared by the app, the background process and the tests
-  dates.js         ISO dates, working days, UK bank holidays
-  csv.js           bank statement parser
-  categories.js    categories, UK merchant keywords, merchant keys
-  recurring.js     schedule expansion, matching bills to payments, recurring detection
-  summary.js       month summary: rings, meters, calendar days, safe-to-spend
-  insights.js      insight rules, trends, compulsory/optional split
-  debt.js          avalanche/snowball payoff simulation
-  state.js         data model and the single reducer every change goes through
-src/renderer/    React UI (dashboard, pages, widget)
-electron/        main process: windows, tray, widget, IPC, store, folder watcher, Open Banking, reminders
+src/engine/            Pure JS core shared by the app, the background process and the tests
+  payroll.js             UK PAYE/NI/pension/student loan take-home (rates table in one place)
+  income.js              pay profile -> paydays for every pay pattern
+  planner.js             pay-period planner: bills pot, smoothing buffer, allowance, bonus paydays
+  receipts.js            receipt text parser, importance tiers, basket analytics
+  caps.js                spend caps per month / week / pay period
+  aiplan.js              AI prompt builder + Pulse Plan v1 validator, diff, apply and undo
+  summary.js, recurring.js, insights.js, debt.js, csv.js, categories.js, dates.js, state.js
+src/renderer/          React UI (pages, widget, onboarding)
+electron/              main process, secure preload bridge, store, folder watcher, OCR, reminders
+electron/connectors/   read-only data connectors (Enable Banking today)
 ```
 
-Security: `contextIsolation`, `sandbox` and no Node.js in the renderer. The UI reaches the system only through a narrow preload API, the production build has a strict Content-Security-Policy, and only https links can be opened externally.
+Tax rates live in `TAX_YEAR` in `payroll.js`. rUK income tax thresholds and NI are frozen, so 2026/27 matches 2025/26. Scottish bands and student-loan thresholds are the 2025/26 figures and should be checked each April.
 
-Design references: the calorie-ring dashboard follows **MyFitnessPal/Yazio**. Budgets and "every pound has a job" follow **YNAB**. Recurring detection and subscription tracking are inspired by **Rocket Money** and the UK apps **Emma** and **Snoop**. The insight cards follow **Copilot Money**, and the avalanche/snowball planner is the standard method from **Undebt.it**.
+## Room to grow (V3)
 
-## Ideas for next steps
+The code is structured so that portfolio features can be added without reworking the app:
 
-- Savings goals (holiday, emergency fund) as extra rings
-- Pay-cycle view (25th to 24th) as an alternative to calendar months
-- Split transactions, and tags such as "holiday"
-- An optional "Ask my finances" chat using your own AI API key
-- Receipt/PDF statement import
+- **Connectors** (`electron/connectors/`) share one interface (`info / saveCredentials / connect / sync / disconnect`). They are read-only by design, so a broker, crypto exchange or fund-platform connector slots in next to Enable Banking. Anything that moves money (trades, SIP/SWP execution) is meant to be a separate, explicitly confirmed capability.
+- **SIPs and SWPs** can already be tracked as recurring payments ("Investment (SIP)" and "Investment withdrawal (SWP)").
+- The data schema is versioned (v2) and reserves a `portfolio` section. The Pulse Plan format rejects investment instructions for now, with a clear message.

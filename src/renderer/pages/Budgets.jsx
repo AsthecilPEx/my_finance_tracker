@@ -3,6 +3,7 @@ import { useApp } from '../store.jsx';
 import { monthSummary } from '../../engine/summary.js';
 import { parseISO } from '../../engine/dates.js';
 import { PALETTE } from '../../engine/categories.js';
+import { CapList } from '../components/Caps.jsx';
 
 const TYPES = { essential: 'Essential', lifestyle: 'Lifestyle', debt: 'Debt', savings: 'Savings', transfer: 'Transfer (ignored)', income: 'Income' };
 
@@ -26,9 +27,10 @@ export default function Budgets() {
   return (
     <div className="page">
       <header className="page-head">
-        <div><h1>Budgets & Categories</h1><p className="muted">Budgets drive the category meters. Categories without a budget are measured against your 3-month average.</p></div>
+        <div><h1>Budgets & Caps</h1><p className="muted">Caps warn you as you get close. Budgets drive the category meters; categories without one are measured against your 3-month average.</p></div>
         <button className="btn ghost" onClick={useAverages}>Fill empty budgets from averages</button>
       </header>
+      <div className="card"><CapList /></div>
       <div className="kpis">
         <div className="kpi"><span>Total monthly budgets</span><b>{fmt(totalBudget, { decimals: 0 })}</b></div>
         <div className="kpi"><span>Expected income</span><b className="pos">{fmt(s.income, { decimals: 0 })}</b></div>

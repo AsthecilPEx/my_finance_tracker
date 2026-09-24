@@ -3,6 +3,8 @@ import { useApp } from '../store.jsx';
 import Modal from '../components/Modal.jsx';
 import { TxnForm } from '../components/Forms.jsx';
 import { shortDate } from '../../engine/dates.js';
+import ReceiptEditor from '../components/ReceiptEditor.jsx';
+import { ITEMISABLE } from '../../engine/receipts.js';
 
 const PAGE = 100;
 
@@ -13,6 +15,8 @@ export default function Transactions({ go }) {
   const [month, setMonth] = useState('');
   const [edit, setEdit] = useState(null);
   const [limit, setLimit] = useState(PAGE);
+  const [receipt, setReceipt] = useState(null);
+  const itemised = useMemo(() => new Map((state.receipts || []).map((r) => [r.txnId, r.items.length])), [state.receipts]);
 
   const months = useMemo(() => [...new Set(state.transactions.map((t) => t.date.slice(0, 7)))].sort().reverse(), [state.transactions]);
   const list = useMemo(() => {
@@ -58,6 +62,9 @@ export default function Transactions({ go }) {
                   <td>
                     <button className="linkish" onClick={() => setEdit(t)}>{t.description}</button>
                     {t.source !== 'manual' && <span className="src">{t.source === 'bank' ? 'bank' : t.source === 'demo' ? 'demo' : 'csv'}</span>}
+                    {t.amount < 0 && ITEMISABLE[t.categoryId] && (
+                      <button className={`receipt-btn ${itemised.has(t.id) ? 'done' : ''}`} onClick={() => setReceipt(t)} title={itemised.has(t.id) ? 'Edit receipt items' : 'Add receipt items'}>🧾 {itemised.has(t.id) ? `${itemised.get(t.id)} items` : 'Itemise'}</button>
+                    )}
                   </td>
                   <td>
                     <select className="cat-select" style={{ '--c': cats[t.categoryId]?.color }} value={t.categoryId} onChange={(e) => recategorise(t, e.target.value)} aria-label="Category">
@@ -73,6 +80,7 @@ export default function Transactions({ go }) {
         )}
         {list.length > limit && <div className="more-row"><button className="btn ghost" onClick={() => setLimit((l) => l + PAGE)}>Show more ({list.length - limit} left)</button></div>}
       </div>
+      {receipt && <ReceiptEditor txn={receipt} onClose={() => setReceipt(null)} />}
       {edit && <Modal title={edit.id ? 'Edit transaction' : 'Add transaction'} onClose={() => setEdit(null)}><TxnForm initial={edit.id ? edit : null} onDone={() => setEdit(null)} /></Modal>}
     </div>
   );

@@ -7,6 +7,7 @@ import { median, round2 } from './money.js';
 export const FREQUENCIES = {
   monthly: 'Monthly',
   'last-working-day': 'Last working day of month',
+  'last-weekday': 'Last chosen weekday of month',
   weekly: 'Weekly',
   fortnightly: 'Every 2 weeks',
   'four-weekly': 'Every 4 weeks',
@@ -21,6 +22,8 @@ export const KINDS = {
   bill: 'Bill',
   subscription: 'Subscription',
   savings: 'Savings transfer',
+  investment: 'Investment (SIP)',
+  withdrawal: 'Investment withdrawal (SWP)',
   other: 'Other',
 };
 
@@ -57,6 +60,7 @@ export function occurrencesBetween(item, from, to, extraHolidays) {
       break;
     case 'monthly':
     case 'quarterly':
+    case 'last-weekday':
     case 'last-working-day': {
       const step = item.frequency === 'quarterly' ? 3 : 1;
       const s = parseISO(start);
@@ -70,6 +74,10 @@ export function occurrencesBetween(item, from, to, extraHolidays) {
           const dim = daysInMonth(y, m);
           if (item.frequency === 'last-working-day') {
             out.push(previousWorkingDay(toISO(new Date(y, m, dim)), holidays));
+          } else if (item.frequency === 'last-weekday') {
+            const last = new Date(y, m, dim);
+            last.setDate(dim - ((last.getDay() - (item.weekday ?? 5) + 7) % 7));
+            push(toISO(last));
           } else {
             const day = Math.min(item.dayOfMonth || s.getDate(), dim);
             push(toISO(new Date(y, m, day)));
@@ -109,7 +117,7 @@ export function occurrencesBetween(item, from, to, extraHolidays) {
 
 /** Monthly-equivalent amount, used for budgeting and "annual cost" insights. */
 export function monthlyEquivalent(amount, frequency) {
-  const f = { weekly: 52 / 12, fortnightly: 26 / 12, 'four-weekly': 13 / 12, quarterly: 1 / 3, yearly: 1 / 12, once: 0 }[frequency];
+  const f = { irregular: 1, weekly: 52 / 12, fortnightly: 26 / 12, 'four-weekly': 13 / 12, quarterly: 1 / 3, yearly: 1 / 12, once: 0 }[frequency];
   return f === undefined ? amount : amount * f;
 }
 

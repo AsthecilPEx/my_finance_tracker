@@ -1,6 +1,17 @@
 import { addDays, addMonths, parseISO, toISO } from './dates.js';
 import { occurrencesBetween } from './recurring.js';
 import { createEmptyState, mergeRows, newId } from './state.js';
+import { incomeItems, newIncome } from './income.js';
+import { suggestTier } from './receipts.js';
+
+// name, typical price, section
+const CATALOG = [
+  ['Semi Skimmed Milk 4pt', 1.45], ['Wholemeal Bread', 0.95], ['Free Range Eggs x12', 2.49], ['Basmati Rice 1kg', 1.89], ['Chicken Breast Fillets', 3.49],
+  ['Bananas', 0.85], ['Apples 6pk', 1.39], ['Potatoes 2kg', 1.25], ['Onions 1kg', 0.89], ['Cheddar Cheese', 2.79], ['Greek Yoghurt', 1.65], ['Pasta 500g', 0.75],
+  ['Chopped Tomatoes', 0.45], ['Broccoli', 0.69], ['Porridge Oats', 0.99], ['Toilet Roll 9pk', 3.99], ['Washing Up Liquid', 1.19], ['Toothpaste', 1.49],
+  ['Orange Juice', 1.69], ['Coffee Pods', 3.49], ['Ready Meal Lasagne', 3.25], ['Houmous', 1.15], ['Frozen Pizza', 2.49], ['Granola', 2.29], ['Sparkling Water', 0.89],
+  ['Salted Crisps 6pk', 1.29], ['Milk Chocolate Bar', 0.99], ['Prosecco 75cl', 5.49], ['Lager 4pk', 4.75], ['Ice Cream Tub', 2.99], ['Chocolate Biscuits', 1.49], ['Haribo Starmix', 1.25], ['Energy Drink', 1.35],
+];
 
 function rng(seed) {
   let a = seed;
@@ -21,14 +32,20 @@ export function createDemoState(today) {
 
   const state = createEmptyState();
   state.settings.onboarded = true;
-  state.settings.name = 'Demo';
+  state.profile = {
+    name: 'Sam',
+    region: 'ruk',
+    incomes: [
+      newIncome({ id: 'inc-main', name: 'Acme Ltd salary', employer: 'acme', payType: 'salary', annual: 48000, pensionPct: 5, schedule: { frequency: 'monthly', dayOfMonth: 25, weekday: 5, adjust: 'previous-working' } }),
+      newIncome({ id: 'inc-bar', name: 'Weekend bar shifts', employer: 'crown', payType: 'hourly', hourlyRate: 12.6, hoursPerWeek: 10, taxCode: 'BR', pensionPct: 0, variable: true, lowestNet: 85, schedule: { frequency: 'weekly', weekday: 5, adjust: 'none' } }),
+    ],
+  };
   state.settings.demo = true;
   const setBudget = { groceries: 380, eating_out: 150, coffee: 45, shopping: 200, transport: 180, entertainment: 60 };
   state.categories = state.categories.map((c) => (setBudget[c.id] ? { ...c, budget: setBudget[c.id] } : c));
 
   const rec = (o) => ({ id: newId(), active: true, adjust: 'none', startDate: start, frequency: 'monthly', ...o });
   state.recurring = [
-    rec({ name: 'Salary – Acme Ltd', match: 'acme', amount: 3450, direction: 'in', kind: 'salary', categoryId: 'salary', dayOfMonth: 25, adjust: 'previous-working' }),
     rec({ name: 'Rent', match: 'openrent', amount: 1050, direction: 'out', kind: 'bill', categoryId: 'housing', dayOfMonth: 1, compulsory: true }),
     rec({ name: 'Council Tax', match: 'council tax', amount: 148, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 1, compulsory: true }),
     rec({ name: 'Octopus Energy', match: 'octopus', amount: 96, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 5, compulsory: true }),
@@ -51,7 +68,7 @@ export function createDemoState(today) {
   const rows = [];
   const add = (date, amount, description) => { if (date <= today) rows.push({ date, amount, description }); };
   const descFor = {
-    acme: 'ACME LTD SALARY BGC', openrent: 'OPENRENT RENT SO', 'council tax': 'LB CAMDEN COUNCIL TAX DD', octopus: 'OCTOPUS ENERGY DD',
+    openrent: 'OPENRENT RENT SO', 'council tax': 'LB CAMDEN COUNCIL TAX DD', octopus: 'OCTOPUS ENERGY DD',
     admiral: 'ADMIRAL INSURANCE DD', 'thames water': 'THAMES WATER DD', vodafone: 'VODAFONE LTD DD', 'virgin media': 'VIRGIN MEDIA DD',
     puregym: 'PUREGYM LTD', netflix: 'NETFLIX.COM', spotify: 'SPOTIFY UK', disney: 'DISNEY PLUS', moneybox: 'MONEYBOX SAVINGS',
   };
@@ -61,6 +78,11 @@ export function createDemoState(today) {
       if (item.match === 'spotify' && d < addMonths(today, -1)) amt = 10.99; // price rise
       if (item.match === 'octopus') amt = between(88, 104);
       add(d, item.direction === 'in' ? amt : -amt, descFor[item.match]);
+    }
+  }
+  for (const inc of incomeItems(state)) {
+    for (const d of occurrencesBetween(inc, start, today)) {
+      add(d, inc.match === 'acme' ? inc.amount : between(85, 135), inc.match === 'acme' ? 'ACME LTD SALARY BGC' : 'THE CROWN PUB PAYROLL');
     }
   }
   for (const debt of state.debts) {
@@ -86,5 +108,35 @@ export function createDemoState(today) {
   }
   // A big one-off this month so the "unusual purchase" insight has something to show.
   add(addDays(monthStartOfToday, 2), -449, 'CURRYS PC WORLD');
-  return mergeRows(state, rows, 'demo').state;
+  let out = mergeRows(state, rows, 'demo').state;
+
+  // Itemise most past grocery shops so basket trends have history; leave recent ones in the inbox.
+  const receipts = [];
+  for (const t of out.transactions) {
+    if (t.categoryId !== 'groceries' || t.date > addDays(today, -6) || r() < 0.25) continue;
+    const thisMonth = t.date >= monthStartOfToday;
+    const items = [];
+    let left = -t.amount;
+    let guard = 0;
+    while (left > 1 && guard++ < 40) {
+      const pool = thisMonth && r() < 0.2 ? CATALOG.slice(25) : CATALOG.slice(0, r() < 0.8 ? 25 : CATALOG.length);
+      const [name, price] = pick(pool);
+      const p = Math.min(left, Math.round(price * (0.9 + r() * 0.3) * 100) / 100);
+      items.push({ id: newId(), name, qty: 1, price: p, tier: suggestTier(name), section: 'groceries' });
+      left = Math.round((left - p) * 100) / 100;
+    }
+    if (left > 0 && items.length) items[items.length - 1].price = Math.round((items[items.length - 1].price + left) * 100) / 100;
+    receipts.push({ id: newId(), txnId: t.id, date: t.date, merchant: t.description, total: -t.amount, section: 'groceries', items, createdAt: t.date });
+  }
+  out = { ...out, receipts };
+  out.caps = [
+    { id: newId(), name: 'Treats in the weekly shop', scope: 'tier', tier: 'low', section: 'groceries', amount: 30, period: 'month', alertAt: 0.8, active: true },
+    { id: newId(), name: 'Coffee runs', scope: 'category', categoryId: 'coffee', amount: 15, period: 'week', alertAt: 0.8, active: true },
+    { id: newId(), name: 'Eating out this pay period', scope: 'category', categoryId: 'eating_out', amount: 300, period: 'payperiod', alertAt: 0.8, active: true },
+  ];
+  out.goals = [
+    { id: newId(), name: 'Emergency fund', icon: '🛟', target: 2000, saved: 650, perMonth: 150, targetDate: addMonths(today, 9), active: true },
+    { id: newId(), name: 'Summer holiday', icon: '🏖️', target: 1200, saved: 300, perMonth: 100, targetDate: addMonths(today, 9), active: true },
+  ];
+  return out;
 }

@@ -1,17 +1,23 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification, screen, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification, screen, safeStorage, clipboard } from 'electron';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store, JsonFile } from './store.js';
 import { FolderWatcher } from './watcher.js';
-import { BankSync } from './openbanking.js';
+import { EnableBankingConnector } from './connectors/index.js';
+import { recognise } from './ocr.js';
 import { startReminders } from './reminders.js';
 import { reduce, migrate } from '../src/engine/state.js';
+import { receiptInbox } from '../src/engine/receipts.js';
+import { formatMoney } from '../src/engine/money.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
-const WIDGET_SIZE = { width: 360, height: 470 };
+const WIDGET_SIZE = { width: 360, height: 500 };
+const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', bmp: 'image/bmp' };
+let receiptsDir;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 app.setAppUserModelId('app.pulsefinance.desktop');
@@ -38,10 +44,8 @@ function createSecrets(file) {
     try { return JSON.parse(v.e ? safeStorage.decryptString(Buffer.from(v.e, 'base64')) : v.p); } catch { return null; }
   };
   return {
-    getCredentials: () => dec(f.get('credentials')),
-    setCredentials: (c) => f.set('credentials', c ? enc(c) : null),
-    get: (k) => (k === 'token' ? dec(f.get('token')) : f.get(k)),
-    setToken: (t) => f.set('token', t ? enc(t) : null),
+    getCredentials: () => dec(f.get('enablebanking')),
+    setCredentials: (c) => f.set('enablebanking', c ? enc(c) : null),
   };
 }
 
@@ -67,12 +71,39 @@ function applySideEffects(a, b) {
   if (a.widget?.pinned !== b.widget?.pinned && widgetWin) widgetWin.setAlwaysOnTop(!!b.widget.pinned, 'floating');
 }
 
-function notify(title, body) {
+function notify(title, body, page) {
   if (Notification.isSupported()) {
     const n = new Notification({ title, body, icon: ICON });
-    n.on('click', showMain);
+    n.on('click', () => navigate(page));
     n.show();
   }
+}
+
+/** Bring the main window forward, optionally on a specific page. */
+function navigate(page) {
+  const fresh = !mainWin;
+  showMain();
+  if (!page) return;
+  if (fresh) mainWin.webContents.once('did-finish-load', () => mainWin?.webContents.send('navigate', page));
+  else mainWin.webContents.send('navigate', page);
+}
+
+/** After new transactions arrive, offer to itemise the newest supermarket/shopping spend. */
+function promptForReceipts(beforeIds) {
+  const state = store.get();
+  if (state.settings.receiptPrompts === false || !state.settings.notifications) return;
+  const fresh = receiptInbox(state, new Date().toISOString().slice(0, 10), 7).filter((t) => !beforeIds.has(t.id));
+  if (!fresh.length) return;
+  const t = fresh[0];
+  const more = fresh.length > 1 ? ` (+${fresh.length - 1} more)` : '';
+  notify(`🧾 ${t.description} · ${formatMoney(-t.amount, state.settings.currency)}${more}`, 'Add the receipt to see how much was essential. Snap a photo or type the items.', 'receipts');
+}
+
+async function importWithPrompt(action) {
+  const before = new Set(store.get().transactions.map((t) => t.id));
+  await dispatch(action);
+  promptForReceipts(before);
+  return store.get().transactions.length - before.size;
 }
 
 // ---------- windows ----------
@@ -208,6 +239,40 @@ function registerIpc() {
     return migrate(JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8')));
   });
 
+  handle('clipboard:write', (text) => clipboard.writeText(String(text)));
+  handle('file:saveText', async (text, name) => {
+    const r = await dialog.showSaveDialog(mainWin, { defaultPath: name, filters: [{ name: 'Text', extensions: ['txt'] }] });
+    if (!r.canceled && r.filePath) fs.writeFileSync(r.filePath, String(text));
+    return !r.canceled;
+  });
+  handle('plan:openFile', async () => {
+    const r = await dialog.showOpenDialog(mainWin, { title: 'Open AI reply', filters: [{ name: 'Text or JSON', extensions: ['txt', 'json', 'md'] }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const stat = fs.statSync(r.filePaths[0]);
+    if (stat.size > 2 * 1024 * 1024) throw new Error('That file is too large to be an AI reply.');
+    return { name: path.basename(r.filePaths[0]), text: fs.readFileSync(r.filePaths[0], 'utf8') };
+  });
+
+  // Receipt photos are copied into the app's own folder and referenced by file name only.
+  const receiptPath = (name) => {
+    if (typeof name !== 'string' || !/^[a-f0-9-]{36}\.(png|jpe?g|webp|bmp)$/i.test(name)) throw new Error('Invalid receipt image');
+    return path.join(receiptsDir, name);
+  };
+  const dataUrl = (file) => `data:${IMAGE_TYPES[path.extname(file).slice(1).toLowerCase()]};base64,${fs.readFileSync(file).toString('base64')}`;
+  handle('receipt:pickImage', async () => {
+    const r = await dialog.showOpenDialog(mainWin, { title: 'Receipt photo', filters: [{ name: 'Images', extensions: Object.keys(IMAGE_TYPES) }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const src = r.filePaths[0];
+    const ext = path.extname(src).slice(1).toLowerCase();
+    if (!IMAGE_TYPES[ext]) throw new Error('Please choose a JPG, PNG or WebP photo. (iPhone HEIC photos can be exported as JPG.)');
+    if (fs.statSync(src).size > 15 * 1024 * 1024) throw new Error('That photo is over 15 MB.');
+    const name = `${crypto.randomUUID()}.${ext}`;
+    fs.copyFileSync(src, path.join(receiptsDir, name));
+    return { file: name, dataUrl: dataUrl(path.join(receiptsDir, name)) };
+  });
+  handle('receipt:image', (name) => dataUrl(receiptPath(name)));
+  handle('receipt:ocr', (name) => recognise(receiptPath(name), path.join(app.getPath('userData'), 'ocr-cache')));
+
   handle('widget:toggle', () => toggleWidget());
   handle('widget:pin', (pinned) => widgetWin?.setAlwaysOnTop(!!pinned, 'floating'));
   handle('widget:close', () => toggleWidget(false));
@@ -217,11 +282,29 @@ function registerIpc() {
     throw new Error('Blocked non-https link');
   });
 
-  handle('bank:hasCredentials', () => bank.hasCredentials());
-  handle('bank:saveCredentials', (id, key) => bank.saveCredentials(id, key));
+  handle('bank:info', () => bank.info());
+  handle('bank:pickKey', async () => {
+    const r = await dialog.showOpenDialog(mainWin, { title: 'Enable Banking private key', filters: [{ name: 'Private key', extensions: ['pem', 'key'] }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    return { name: path.basename(r.filePaths[0]), text: fs.readFileSync(r.filePaths[0], 'utf8') };
+  });
+  handle('bank:saveCredentials', (appId, pem) => bank.saveCredentials(appId, pem));
   handle('bank:institutions', (country) => bank.institutions(country));
-  handle('bank:connect', async (id, name, days) => { const r = await bank.connect(id, name, days); updateTray(); showMain(); return r; });
-  handle('bank:sync', () => bank.sync());
+  handle('bank:connect', async (name, country, validity) => {
+    const before = new Set(store.get().transactions.map((t) => t.id));
+    const r = await bank.connect(name, country, validity);
+    updateTray();
+    showMain();
+    promptForReceipts(before);
+    return r;
+  });
+  handle('bank:completeWithUrl', (url) => bank.completeWithUrl(url));
+  handle('bank:sync', async () => {
+    const before = new Set(store.get().transactions.map((t) => t.id));
+    const r = await bank.sync();
+    promptForReceipts(before);
+    return r;
+  });
   handle('bank:disconnect', async () => { await bank.disconnect(); updateTray(); });
 
   handle('watcher:status', () => watcher.status());
@@ -234,6 +317,8 @@ app.on('second-instance', showMain);
 app.whenReady().then(() => {
   const dir = app.getPath('userData');
   store = new Store(dir);
+  receiptsDir = path.join(dir, 'receipts');
+  fs.mkdirSync(receiptsDir, { recursive: true });
   const secrets = createSecrets(path.join(dir, 'secrets.json'));
   const meta = new JsonFile(path.join(dir, 'pulse-meta.json'));
 
@@ -241,13 +326,16 @@ app.whenReady().then(() => {
     processed: meta,
     log,
     onRows: async (rows, fileName) => {
-      const before = store.get().transactions.length;
-      await dispatch({ type: 'txn/import', payload: { rows, source: 'watch', fileName } });
-      const added = store.get().transactions.length - before;
-      if (added > 0) notify('Statement imported', `${added} new transaction${added === 1 ? '' : 's'} from ${fileName}`);
+      const added = await importWithPrompt({ type: 'txn/import', payload: { rows, source: 'watch', fileName } });
+      if (added > 0) notify('Statement imported', `${added} new transaction${added === 1 ? '' : 's'} from ${fileName}`, 'transactions');
     },
   });
-  bank = new BankSync({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), log });
+  bank = new EnableBankingConnector({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), log });
+  bank.snapshot = () => new Set(store.get().transactions.map((t) => t.id));
+  bank.onNewTransactions = (added, from, before) => {
+    notify('Bank synced', `${added} new transaction${added === 1 ? '' : 's'} from ${from}`, 'transactions');
+    if (before) promptForReceipts(before);
+  };
 
   registerIpc();
   const s = store.get().settings;
