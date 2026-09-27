@@ -6,6 +6,9 @@ import { newIncome, profileSummary, describeSchedule } from '../../engine/income
 import { Field } from '../components/Forms.jsx';
 import Modal from '../components/Modal.jsx';
 import IncomeEditor from '../components/IncomeEditor.jsx';
+import { CURRENCIES, formatMoney } from '../../engine/money.js';
+import { currenciesInUse, historicalRate } from '../../engine/fx.js';
+import { addDays } from '../../engine/dates.js';
 
 export default function Settings() {
   const { state, dispatch, notify, today, fmt } = useApp();
@@ -43,10 +46,9 @@ export default function Settings() {
               <option value="scotland">Scotland</option>
             </select>
           </Field>
-          <Field label="Currency">
-            <select value={st.currency} onChange={(e) => set({ currency: e.target.value })}>
-              <option value="GBP">£ Pound sterling</option>
-              <option value="EUR">€ Euro</option>
+          <Field label="Home currency" hint="Everything is totalled in this">
+            <select value={st.currency} onChange={(e) => { if (confirm('Change your home currency? Amounts already recorded keep their values; bills and debts in other currencies are re-converted.')) set({ currency: e.target.value }); }}>
+              {Object.entries(CURRENCIES).map(([k, v]) => <option key={k} value={k}>{v.symbol} {v.name} ({k})</option>)}
             </select>
           </Field>
         </div>
@@ -64,6 +66,8 @@ export default function Settings() {
         </ul>
         <button className="btn ghost" onClick={() => setEditing(newIncome({ name: prof.sources.length ? 'Second income' : 'Main job', taxCode: prof.sources.length ? 'BR' : '1257L' }))}>+ Add income</button>
       </div>
+
+      <Currencies />
 
       <div className="card">
         <h3>🪣 Bills pot & safety net</h3>
@@ -125,5 +129,76 @@ function Toggle({ label, checked, onChange }) {
       <span>{label}</span>
       <span className="switch"><input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} /><span /></span>
     </label>
+  );
+}
+
+function Currencies() {
+  const { state, dispatch, notify, today } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [add, setAdd] = useState('');
+  const base = state.settings.currency;
+  const fx = state.fx;
+  const inUse = currenciesInUse(state, { includeWatched: false });
+  const watched = state.settings.watchCurrencies || [];
+  const list = [...new Set([...inUse, ...watched])].filter((c) => c !== base);
+  const monthAgo = addDays(today, -30);
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      const r = await api.fx.refresh();
+      notify(`Rates updated (${r.date}, ${r.source})`, 'good');
+    } catch (e) {
+      notify(e.message, 'critical');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const setManual = (cur) => {
+    const v = prompt(`How many ${cur} for 1 ${base}?`, fx?.rates?.[cur] || '');
+    if (!v || !(+v > 0)) return;
+    dispatch({ type: 'fx/set', payload: { ...(fx || { base, history: {} }), base, rates: { ...(fx?.rates || {}), [cur]: +v }, source: 'manual', date: today } });
+  };
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3>💱 Currencies & exchange rates</h3>
+        {isDesktop && <button className="btn ghost sm" disabled={busy} onClick={refresh}>{busy ? 'Updating…' : 'Update now'}</button>}
+      </div>
+      <p className="muted sm">
+        Bills, debts and EMIs can be in any currency (choose it when adding them). Pulse downloads daily reference rates each time it runs, then re-converts every total, forecast and insight so you can see small exchange-rate changes in what things really cost you.
+        {fx?.date ? ` Rates from ${fx.date}${fx.source ? ` (${fx.source})` : ''}.` : ' No rates downloaded yet.'}
+      </p>
+      {list.length > 0 && (
+        <table className="table fx-table">
+          <thead><tr><th>Currency</th><th className="num">1 {base} =</th><th className="num">30 days ago</th><th className="num">Change</th><th /></tr></thead>
+          <tbody>
+            {list.map((c) => {
+              const now = fx?.base === base ? fx.rates?.[c] : null;
+              const then = now ? historicalRate(fx, c, monthAgo) : null;
+              const ch = now && then ? (now - then) / then : null;
+              return (
+                <tr key={c}>
+                  <td><b>{c}</b> <span className="muted">{CURRENCIES[c]?.name || ''}{inUse.includes(c) ? ' · in use' : ''}</span></td>
+                  <td className="num">{now ? formatMoney(now, c, { decimals: 2 }) : <span className="note">no rate yet</span>}</td>
+                  <td className="num muted">{then && then !== now ? formatMoney(then, c, { decimals: 2 }) : '–'}</td>
+                  <td className={`num ${ch > 0 ? 'pos' : ch < 0 ? 'neg' : ''}`} title="Positive means your pound buys more">{ch !== null && then !== now ? `${ch > 0 ? '+' : ''}${(ch * 100).toFixed(2)}%` : '–'}</td>
+                  <td className="num">
+                    <button className="linkish muted sm" onClick={() => setManual(c)}>set manually</button>
+                    {!inUse.includes(c) && <button className="icon-btn" aria-label={`Stop watching ${c}`} onClick={() => dispatch({ type: 'settings/update', payload: { watchCurrencies: watched.filter((x) => x !== c) } })}>✕</button>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <div className="inline-row">
+        <select value={add} onChange={(e) => setAdd(e.target.value)}>
+          <option value="">Watch another currency…</option>
+          {Object.entries(CURRENCIES).filter(([k]) => k !== base && !list.includes(k)).map(([k, v]) => <option key={k} value={k}>{k} · {v.name}</option>)}
+        </select>
+        <button className="btn ghost sm" disabled={!add} onClick={() => { dispatch({ type: 'settings/update', payload: { watchCurrencies: [...watched, add] } }); setAdd(''); if (isDesktop) refresh(); }}>Add</button>
+      </div>
+    </div>
   );
 }

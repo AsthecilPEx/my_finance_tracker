@@ -112,7 +112,7 @@ describe('spend caps and pay planner', () => {
   it('measures pay variability on complete months only', () => {
     const v = incomeVariability(s, T);
     expect(v.months).toBeGreaterThanOrEqual(3);
-    expect(v.min).toBeGreaterThan(3000); // not the half-finished current month
+    expect(v.min).toBeGreaterThan(3300); // not the half-finished current month
   });
   it('finds months with an extra weekly payday', () => {
     const bonus = bonusPaydayMonths(s, T);

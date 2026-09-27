@@ -47,8 +47,8 @@ export class EnableBankingConnector {
   kind = 'bank';
   capabilities = ['read'];
 
-  constructor({ secrets, getState, dispatch, notify, openExternal, log = console.log }) {
-    Object.assign(this, { secrets, getState, dispatch, notify, openExternal, log });
+  constructor({ secrets, getState, dispatch, notify, openExternal, fetchImpl = globalThis.fetch, log = console.log }) {
+    Object.assign(this, { secrets, getState, dispatch, notify, openExternal, fetchImpl, log });
     this.pending = null;
     this.timer = setInterval(() => this.autoSync(), 30 * 60 * 1000);
     setTimeout(() => this.autoSync(), 20_000);
@@ -61,7 +61,7 @@ export class EnableBankingConnector {
   async request(pathname, { method = 'GET', body } = {}) {
     const c = this.creds();
     if (!c) throw new Error('Add your Enable Banking application first.');
-    const res = await fetch(BASE + pathname, {
+    const res = await this.fetchImpl(BASE + pathname, {
       method,
       headers: { authorization: `Bearer ${makeJwt(c.appId, c.key)}`, accept: 'application/json', 'content-type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,

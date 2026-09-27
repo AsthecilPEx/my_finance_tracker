@@ -1,4 +1,6 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification, screen, safeStorage, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification, screen, safeStorage, clipboard, session, net } from 'electron';
+import { createSecureFetch } from './net.js';
+import { startFxUpdater } from './fx-updater.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +22,9 @@ const IMAGE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', w
 let receiptsDir;
 
 if (!app.requestSingleInstanceLock()) app.quit();
+// Sandbox every process (renderers are also sandboxed per window below). Skipped only when
+// Chromium is started with --no-sandbox, e.g. CI containers running as root.
+if (!app.commandLine.hasSwitch('no-sandbox')) app.enableSandbox();
 app.setAppUserModelId('app.pulsefinance.desktop');
 
 let store;
@@ -29,6 +34,8 @@ let tray = null;
 let quitting = false;
 let watcher;
 let bank;
+let fxUpdater;
+const secureFetch = createSecureFetch((url, opts) => net.fetch(url, opts), { log: (...a) => console.log('[net]', ...a) });
 
 const log = (...args) => console.log('[pulse]', ...args);
 
@@ -69,6 +76,7 @@ function applySideEffects(a, b) {
   }
   if (a.watchFolder !== b.watchFolder || a.watchEnabled !== b.watchEnabled) watcher.configure(b.watchFolder, b.watchEnabled);
   if (a.widget?.pinned !== b.widget?.pinned && widgetWin) widgetWin.setAlwaysOnTop(!!b.widget.pinned, 'floating');
+  if ((a.currency !== b.currency || (a.watchCurrencies || []).join() !== (b.watchCurrencies || []).join()) && fxUpdater) fxUpdater.refresh().catch(() => {});
 }
 
 function notify(title, body, page) {
@@ -307,14 +315,60 @@ function registerIpc() {
   });
   handle('bank:disconnect', async () => { await bank.disconnect(); updateTray(); });
 
+  handle('fx:refresh', () => fxUpdater.refresh());
   handle('watcher:status', () => watcher.status());
   handle('watcher:scan', () => watcher.scan());
 }
+
+// ---------- security & right-click ----------
+/** Lock down the web layer: no permissions, no webviews, no network from the UI. */
+function hardenSession() {
+  const ses = session.defaultSession;
+  ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  ses.setPermissionCheckHandler(() => false);
+  ses.webRequest.onBeforeRequest((details, cb) => {
+    const u = details.url;
+    const local = u.startsWith('file:') || u.startsWith('data:') || u.startsWith('devtools:') || u.startsWith('chrome-extension:') || (DEV_URL && (u.startsWith(DEV_URL) || u.startsWith(DEV_URL.replace('http', 'ws'))));
+    // Bank logos are the only remote content the UI may show.
+    const logo = details.resourceType === 'image' && /^https:\/\/([a-z0-9-]+\.)*enablebanking\.com\//i.test(u);
+    cb({ cancel: !(local || logo) });
+  });
+}
+
+app.on('web-contents-created', (_e, contents) => {
+  contents.on('will-attach-webview', (e) => e.preventDefault());
+  // Standard right-click menu for text fields and selected text.
+  contents.on('context-menu', (_ev, params) => {
+    const f = params.editFlags;
+    const template = [];
+    if (params.misspelledWord) {
+      for (const s of params.dictionarySuggestions.slice(0, 5)) template.push({ label: s, click: () => contents.replaceMisspelling(s) });
+      if (template.length) template.push({ type: 'separator' });
+    }
+    if (params.isEditable) {
+      template.push(
+        { label: 'Undo', role: 'undo', enabled: f.canUndo },
+        { label: 'Redo', role: 'redo', enabled: f.canRedo },
+        { type: 'separator' },
+        { label: 'Cut', role: 'cut', enabled: f.canCut },
+        { label: 'Copy', role: 'copy', enabled: f.canCopy },
+        { label: 'Paste', role: 'paste', enabled: f.canPaste },
+        { label: 'Delete', role: 'delete', enabled: f.canDelete },
+        { type: 'separator' },
+        { label: 'Select all', role: 'selectAll', enabled: f.canSelectAll },
+      );
+    } else if (params.selectionText.trim()) {
+      template.push({ label: 'Copy', role: 'copy' }, { label: 'Select all', role: 'selectAll' });
+    }
+    if (template.length) Menu.buildFromTemplate(template).popup({ window: BrowserWindow.fromWebContents(contents) || undefined });
+  });
+});
 
 // ---------- lifecycle ----------
 app.on('second-instance', showMain);
 
 app.whenReady().then(() => {
+  hardenSession();
   const dir = app.getPath('userData');
   store = new Store(dir);
   receiptsDir = path.join(dir, 'receipts');
@@ -330,7 +384,8 @@ app.whenReady().then(() => {
       if (added > 0) notify('Statement imported', `${added} new transaction${added === 1 ? '' : 's'} from ${fileName}`, 'transactions');
     },
   });
-  bank = new EnableBankingConnector({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), log });
+  bank = new EnableBankingConnector({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), fetchImpl: secureFetch, log });
+  fxUpdater = startFxUpdater({ getState: () => store.get(), dispatch, secureFetch, log });
   bank.snapshot = () => new Set(store.get().transactions.map((t) => t.id));
   bank.onNewTransactions = (added, from, before) => {
     notify('Bank synced', `${added} new transaction${added === 1 ? '' : 's'} from ${from}`, 'transactions');
@@ -355,6 +410,7 @@ app.on('before-quit', () => {
   store?.flush();
   watcher?.stop();
   bank?.stop();
+  fxUpdater?.stop();
 });
 
 app.on('window-all-closed', () => {

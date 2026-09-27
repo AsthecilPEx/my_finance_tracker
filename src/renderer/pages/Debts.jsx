@@ -4,6 +4,8 @@ import Modal from '../components/Modal.jsx';
 import { DebtForm } from '../components/Forms.jsx';
 import { DEBT_TYPES, simulatePayoff, monthlyInterest } from '../../engine/debt.js';
 import { addMonths, ordinal, parseISO } from '../../engine/dates.js';
+import { financialView } from '../../engine/view.js';
+import { formatMoney } from '../../engine/money.js';
 
 function payoffDate(today, months) {
   if (!isFinite(months)) return 'Never at this rate';
@@ -15,7 +17,8 @@ export default function Debts() {
   const [edit, setEdit] = useState(null);
   const [extra, setExtra] = useState(state.settings.debtPlan?.extra ?? 100);
   const chosen = state.settings.debtPlan?.strategy || 'avalanche';
-  const debts = state.debts.filter((d) => d.balance > 0);
+  const view = financialView(state); // foreign-currency debts converted at today's rate
+  const debts = view.debts.filter((d) => d.balance > 0);
   const total = debts.reduce((s, d) => s + d.balance, 0);
   const minTotal = debts.reduce((s, d) => s + (d.minPayment || 0), 0);
   const plans = useMemo(() => ({
@@ -43,23 +46,24 @@ export default function Debts() {
         <div className="card"><p className="empty">No debts added. Add credit cards, loans, car finance, BNPL or money owed to friends to plan a payoff.</p></div>
       ) : (
         <div className="debt-grid">
-          {state.debts.map((d) => {
+          {view.debts.map((d) => {
             const paid = d.originalBalance > 0 ? Math.min(1, 1 - d.balance / d.originalBalance) : 0;
             return (
               <div key={d.id} className="card debt">
                 <div className="card-head">
                   <div><h3>{d.name}</h3><span className="muted sm">{DEBT_TYPES[d.type] || d.type}{d.dueDay ? ` · due on the ${ordinal(d.dueDay)}` : ''}</span></div>
                   <div className="row-actions">
-                    <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(d)}>✎</button>
+                    <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.debts.find((x) => x.id === d.id))}>✎</button>
                     <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'debt/delete', payload: { id: d.id } })}>🗑</button>
                   </div>
                 </div>
-                <div className="debt-bal">{fmt(d.balance, { decimals: 0 })}</div>
+                <div className="debt-bal">{d.native ? formatMoney(d.native.balance, d.native.currency, { decimals: 0 }) : fmt(d.balance, { decimals: 0 })}</div>
+                {d.native && <div className="muted sm">≈ {fmt(d.balance, { decimals: 0 })} at today's rate · EMI {formatMoney(d.native.minPayment, d.native.currency)} ≈ {fmt(d.minPayment)}</div>}
                 <div className="progress" aria-label={`${Math.round(paid * 100)}% paid off`}><span style={{ width: `${paid * 100}%` }} /></div>
                 <div className="debt-meta">
                   <span>{Math.round(paid * 100)}% paid off</span>
                   <span className={d.apr >= 15 ? 'neg' : ''}>{d.apr || 0}% APR</span>
-                  <span>{fmt(d.minPayment || 0)}/mo</span>
+                  <span>{d.native ? formatMoney(d.native.minPayment, d.native.currency) : fmt(d.minPayment || 0)}/mo</span>
                 </div>
                 <div className="muted sm">Cleared {payoffDate(today, plans.avalanche.payoffMonth[d.id] ?? Infinity)} on the plan below</div>
               </div>

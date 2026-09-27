@@ -4,6 +4,7 @@ import { categoryMap, SPENDING_TYPES } from './categories.js';
 import { round2, sum } from './money.js';
 import { monthlyInterest } from './debt.js';
 import { incomeItems } from './income.js';
+import { financialView } from './view.js';
 
 /** Recurring bills plus paydays generated from the pay profile. */
 export function scheduleItems(state) {
@@ -14,6 +15,7 @@ const KIND_TO_TYPE = { salary: 'payday', income: 'income', bill: 'bill', subscri
 
 /** Expected money events (paydays, bills, subscriptions, debt payments) between two dates. */
 export function buildOccurrences(state, from, to) {
+  state = financialView(state);
   const holidays = state.settings?.extraHolidays;
   const out = [];
   for (const r of scheduleItems(state)) {
@@ -70,6 +72,7 @@ export function isSpendingCategory(cat) {
 }
 
 export function monthSummary(state, year, month, today) {
+  state = financialView(state);
   const cats = categoryMap(state.categories);
   const from = monthStart(year, month);
   const to = monthEnd(year, month);
@@ -183,6 +186,7 @@ export function monthSummary(state, year, month, today) {
 
 /** Unpaid money events in the next `days` days (for the "coming up" list and the widget). */
 export function upcoming(state, today, days = 14) {
+  state = financialView(state);
   const to = addDays(today, days);
   const recent = state.transactions.filter((t) => t.date >= addDays(today, -6));
   return matchOccurrences(buildOccurrences(state, today, to), recent)

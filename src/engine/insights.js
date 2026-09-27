@@ -3,6 +3,8 @@ import { categoryMap, merchantKey, SPENDING_TYPES } from './categories.js';
 import { categoryTotalsByMonth } from './summary.js';
 import { detectRecurring, monthlyEquivalent, prettyName } from './recurring.js';
 import { simulatePayoff } from './debt.js';
+import { financialView } from './view.js';
+import { fxDrift } from './fx.js';
 import { formatMoney, median, round2, sum } from './money.js';
 
 const STREAMING = ['netflix', 'disney', 'prime video', 'amazon prime', 'now tv', 'nowtv', 'paramount', 'apple tv', 'dazn', 'britbox', 'discovery+'];
@@ -31,6 +33,8 @@ export function recurringWordList(state) {
 }
 
 export function generateInsights(state, today, currency = 'GBP') {
+  const drift = fxDrift(state, today);
+  state = financialView(state);
   const fmt = (n, o) => formatMoney(n, currency, o);
   const cats = categoryMap(state.categories);
   const t0 = parseISO(today);
@@ -156,6 +160,18 @@ export function generateInsights(state, today, currency = 'GBP') {
       title: `${s.name} went up by ${fmt(diff)}`,
       detail: `Now ${fmt(s.amountChanged.to)} (was ${fmt(s.amountChanged.from)}), up ${Math.round((diff / s.amountChanged.from) * 100)}%. Worth calling to haggle or switching provider.`,
       saving: round2(diff),
+    });
+  }
+
+  // 5b. Exchange-rate changes on bills/EMIs paid in another currency
+  for (const d of drift) {
+    if (Math.abs(d.change) < 0.5 && Math.abs(d.pct) < 0.01) continue;
+    const up = d.change > 0;
+    cards.push({
+      id: `fx-${d.name}`, kind: up ? 'warning' : 'good', icon: '💱',
+      title: `${d.name} costs ${fmt(Math.abs(d.change))} ${up ? 'more' : 'less'} than a month ago`,
+      detail: `${formatMoney(d.amount, d.currency)} is ${fmt(d.costNow)} at today's rate vs ${fmt(d.costThen)} 30 days ago (${up ? '+' : ''}${(d.pct * 100).toFixed(1)}%).${up ? ' If you can, send it on a better-rate day or lock in a rate with your transfer provider.' : ''}`,
+      saving: up ? d.change : 0,
     });
   }
 

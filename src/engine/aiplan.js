@@ -10,6 +10,10 @@ import { CAP_PERIODS } from './caps.js';
 import { lastMonths, parseISO } from './dates.js';
 import { categoryTotalsByMonth } from './summary.js';
 import { round2 } from './money.js';
+import { financialView } from './view.js';
+
+/** Names compare loosely: case, spacing, emoji and punctuation don't matter. */
+export const normName = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 export const PLAN_VERSION = 1;
 const MAX_AMOUNT = 1_000_000;
@@ -32,6 +36,7 @@ export function planSchemaExample(state) {
 }
 
 function snapshot(state, today) {
+  state = financialView(state);
   const cats = categoryMap(state.categories);
   const t = parseISO(today);
   const prof = profileSummary(state);
@@ -53,8 +58,9 @@ function snapshot(state, today) {
     categories: state.categories.filter((c) => c.type !== 'income' && c.type !== 'transfer').map((c) => ({ id: c.id, name: c.name, type: c.type, budget: c.budget || 0, avgMonthlySpend3m: avg(c.id) })).filter((c) => c.budget || c.avgMonthlySpend3m),
     thisMonth: { income: cur.income, spent: cur.spent, billsStillToPay: cur.committedPending, leftToSpend: cur.leftToSpend },
     itemisedShopping: basket.receiptsCount ? { avgMonthlyByImportance: basket.avgByTier, topNotSoImportantItems: basket.lowItems.slice(0, 5).map((i) => ({ name: i.name, perMonth: i.perMonth })) } : 'not enough receipts yet',
-    currentCaps: (state.caps || []).map((c) => ({ name: c.name, scope: c.scope, category: c.categoryId, tier: c.tier, section: c.section, amount: c.amount, period: c.period })),
-    currentGoals: (state.goals || []).map((g) => ({ name: g.name, target: g.target, saved: g.saved, targetDate: g.targetDate, perMonth: g.perMonth })),
+    activePlan: (state.planHistory || []).find((h) => !h.undone && !h.superseded)?.title || null,
+    currentCaps: (state.caps || []).map((c) => ({ id: c.id, name: c.name, scope: c.scope, category: c.categoryId, tier: c.tier, section: c.section, amount: c.amount, period: c.period })),
+    currentGoals: (state.goals || []).map((g) => ({ id: g.id, name: g.name, target: g.target, saved: g.saved, targetDate: g.targetDate, perMonth: g.perMonth })),
     validCategoryIds: Object.keys(cats).filter((id) => !['salary', 'income_other', 'transfer'].includes(id)),
   };
 }
@@ -86,7 +92,9 @@ ${example}
 - "budgets[].category" must be one of validCategoryIds. "monthly" is the new monthly budget (0 removes it).
 - "caps[].scope" is one of: "category" (needs "category"), "tier" (needs "tier": ${Object.keys(TIERS).map((t) => `"${t}"`).join(' | ')}; optional "section": ${Object.keys(SECTIONS).map((s) => `"${s}"`).join(' | ')}), "section" (needs "section"), "total".
 - "caps[].period" is one of: ${Object.keys(CAP_PERIODS).map((p) => `"${p}"`).join(' | ')}. "alertAt" is 0.5–1 (warn at that fraction).
-- "capsMode": "merge" adds/updates caps by name; "replace" removes caps not in your list.
+- UPDATING vs CREATING: to change an existing cap or goal, copy its "id" and exact "name" from currentCaps / currentGoals. Only leave "id" out for something genuinely new. Never create a second cap or goal for the same purpose under a new name.
+- If "activePlan" is set and you are revising that plan, keep the same "title" so the app replaces it instead of adding another.
+- "capsMode": "merge" adds/updates caps; "replace" also removes caps not in your list.
 - "goals": savings goals with target, optional saved-so-far, optional targetDate and a monthly contribution "perMonth".
 - "debtPlan.strategy": "avalanche" or "snowball". "pauseRecurring": exact names of recurring payments to pause (e.g. subscriptions to cancel).
 - Omit any section you don't want to change. Keep the plan realistic: total budgets + bills + goals must not exceed monthly take-home pay.
@@ -132,7 +140,7 @@ export function parsePlan(text, state) {
     const scope = ['category', 'tier', 'section', 'total'].includes(c?.scope) ? c.scope : null;
     const amt = num(c?.amount, `cap "${c?.name}"`);
     if (!scope || amt === null) { if (!scope) warnings.push(`Cap "${c?.name}" has an unknown scope.`); continue; }
-    const cap = { name: str(c.name, 60) || '', scope, amount: amt, period: CAP_PERIODS[c.period] ? c.period : 'month', alertAt: Math.min(1, Math.max(0.5, +c.alertAt || 0.8)) };
+    const cap = { id: (state.caps || []).some((x) => x.id === c.id) ? c.id : undefined, name: str(c.name, 60) || '', scope, amount: amt, period: CAP_PERIODS[c.period] ? c.period : 'month', alertAt: Math.min(1, Math.max(0.5, +c.alertAt || 0.8)) };
     if (scope === 'category') { cap.categoryId = catId(c.category); if (!cap.categoryId) { warnings.push(`Cap "${c.name}": unknown category.`); continue; } }
     if (scope === 'tier') { if (!TIERS[c.tier]) { warnings.push(`Cap "${c.name}": unknown tier.`); continue; } cap.tier = c.tier; }
     if (scope === 'tier' || scope === 'section') { if (c.section && SECTIONS[c.section]) cap.section = c.section; else if (scope === 'section') { warnings.push(`Cap "${c.name}": unknown section.`); continue; } }
@@ -141,7 +149,7 @@ export function parsePlan(text, state) {
   for (const g of Array.isArray(raw.goals) ? raw.goals : []) {
     const target = num(g?.target, `goal "${g?.name}" target`, { min: 1 });
     if (!str(g?.name) || target === null) continue;
-    plan.goals.push({ name: str(g.name, 60), icon: str(g.icon, 4) || '🎯', target, saved: num(g.saved ?? 0, 'goal saved') || 0, targetDate: date(g.targetDate), perMonth: num(g.perMonth ?? 0, `goal "${g.name}" monthly amount`) || 0 });
+    plan.goals.push({ id: (state.goals || []).some((x) => x.id === g.id) ? g.id : undefined, name: str(g.name, 60), icon: str(g.icon, 4) || '🎯', target, saved: num(g.saved ?? 0, 'goal saved') || 0, targetDate: date(g.targetDate), perMonth: num(g.perMonth ?? 0, `goal "${g.name}" monthly amount`) || 0 });
   }
   if (raw.debtPlan) {
     const strategy = raw.debtPlan.strategy === 'snowball' ? 'snowball' : 'avalanche';
@@ -160,6 +168,11 @@ export function parsePlan(text, state) {
   return { plan: errors.length ? null : plan, errors, warnings };
 }
 
+/** An existing cap/goal this plan item refers to: same id, else same (loosely compared) name. */
+export function findExisting(list = [], item) {
+  return (item.id && list.find((x) => x.id === item.id)) || (item.name && list.find((x) => normName(x.name) === normName(item.name))) || null;
+}
+
 /** Human-readable list of changes, each with an id the user can untick. */
 export function diffPlan(state, plan, fmt = (n) => String(n)) {
   const cats = categoryMap(state.categories);
@@ -168,17 +181,15 @@ export function diffPlan(state, plan, fmt = (n) => String(n)) {
     const before = cats[b.categoryId]?.budget || 0;
     if (before !== b.monthly) changes.push({ id: `budget:${b.categoryId}`, group: 'Budgets', text: `${cats[b.categoryId].icon} ${cats[b.categoryId].name}: ${before ? fmt(before) : 'no budget'} → ${b.monthly ? fmt(b.monthly) : 'no budget'}` });
   }
-  const existing = new Map((state.caps || []).map((c) => [(c.name || '').toLowerCase(), c]));
   plan.caps.forEach((c, i) => {
-    const prev = c.name && existing.get(c.name.toLowerCase());
+    const prev = findExisting(state.caps, c);
     changes.push({ id: `cap:${i}`, group: 'Spend caps', text: `${prev ? 'Update' : 'New'} cap "${c.name || 'Unnamed'}": ${fmt(c.amount)} ${CAP_PERIODS[c.period]}${prev ? ` (was ${fmt(prev.amount)})` : ''}` });
   });
   if (plan.capsMode === 'replace') {
-    const keep = new Set(plan.caps.map((c) => (c.name || '').toLowerCase()));
-    for (const c of state.caps || []) if (!keep.has((c.name || '').toLowerCase())) changes.push({ id: `capdel:${c.id}`, group: 'Spend caps', text: `Remove cap "${c.name}"` });
+    const kept = new Set(plan.caps.map((c) => findExisting(state.caps, c)?.id).filter(Boolean));
+    for (const c of state.caps || []) if (!kept.has(c.id)) changes.push({ id: `capdel:${c.id}`, group: 'Spend caps', text: `Remove cap "${c.name}"` });
   }
-  const goals = new Map((state.goals || []).map((g) => [g.name.toLowerCase(), g]));
-  plan.goals.forEach((g, i) => changes.push({ id: `goal:${i}`, group: 'Savings goals', text: `${goals.has(g.name.toLowerCase()) ? 'Update' : 'New'} goal ${g.icon} ${g.name}: ${fmt(g.target)}${g.perMonth ? `, saving ${fmt(g.perMonth)}/month` : ''}${g.targetDate ? ` by ${g.targetDate}` : ''}` }));
+  plan.goals.forEach((g, i) => changes.push({ id: `goal:${i}`, group: 'Savings goals', text: `${findExisting(state.goals, g) ? 'Update' : 'New'} goal ${g.icon} ${g.name}: ${fmt(g.target)}${g.perMonth ? `, saving ${fmt(g.perMonth)}/month` : ''}${g.targetDate ? ` by ${g.targetDate}` : ''}` }));
   if (plan.debtPlan) changes.push({ id: 'debt', group: 'Debts', text: `Debt strategy: ${plan.debtPlan.strategy}${plan.debtPlan.extra ? ` with ${fmt(plan.debtPlan.extra)}/month extra` : ''}` });
   for (const n of plan.pauseRecurring) changes.push({ id: `pause:${n.toLowerCase()}`, group: 'Recurring', text: `Pause "${n}"` });
   if (plan.billPot) changes.push({ id: 'billpot', group: 'Pay planner', text: `${plan.billPot.enabled ? 'Use' : 'Stop using'} a bills pot for each payday` });
@@ -197,18 +208,19 @@ export function applyPlan(state, plan, selectedIds, newId) {
   if (plan.capsMode === 'replace') caps = caps.filter((c) => !sel.has(`capdel:${c.id}`));
   plan.caps.forEach((c, i) => {
     if (!sel.has(`cap:${i}`)) return;
-    const idx = caps.findIndex((x) => c.name && (x.name || '').toLowerCase() === c.name.toLowerCase());
-    if (idx >= 0) caps[idx] = { ...caps[idx], ...c, source: 'ai' };
-    else caps.push({ id: newId(), active: true, source: 'ai', ...c });
+    const prev = findExisting(caps, c);
+    if (prev) caps[caps.indexOf(prev)] = { ...prev, ...c, id: prev.id, source: 'ai' };
+    else caps.push({ active: true, source: 'ai', ...c, id: newId() });
   });
   next.caps = caps;
 
   const goals = [...(state.goals || [])];
   plan.goals.forEach((g, i) => {
     if (!sel.has(`goal:${i}`)) return;
-    const idx = goals.findIndex((x) => x.name.toLowerCase() === g.name.toLowerCase());
-    if (idx >= 0) goals[idx] = { ...goals[idx], ...g };
-    else goals.push({ id: newId(), active: true, ...g });
+    const prev = findExisting(goals, g);
+    // Keep what's already been saved unless the plan explicitly sets it.
+    if (prev) goals[goals.indexOf(prev)] = { ...prev, ...g, id: prev.id, saved: g.saved || prev.saved || 0 };
+    else goals.push({ active: true, ...g, id: newId() });
   });
   next.goals = goals;
 
@@ -217,9 +229,10 @@ export function applyPlan(state, plan, selectedIds, newId) {
   const pause = new Set(plan.pauseRecurring.filter((n) => sel.has(`pause:${n.toLowerCase()}`)).map((n) => n.toLowerCase()));
   if (pause.size) next.recurring = next.recurring.map((r) => (pause.has(r.name.toLowerCase()) ? { ...r, active: false } : r));
 
+  // A plan with the same title is a new version of it: the older entry is marked replaced.
   next.planHistory = [
     { id: newId(), appliedAt: new Date().toISOString(), title: plan.title, strategy: plan.strategy, summary: plan.summary, tips: plan.tips, changes: selectedIds.length, before },
-    ...(state.planHistory || []),
+    ...(state.planHistory || []).map((h) => (normName(h.title) === normName(plan.title) && !h.undone ? { ...h, superseded: true } : h)),
   ].slice(0, 10);
   return next;
 }

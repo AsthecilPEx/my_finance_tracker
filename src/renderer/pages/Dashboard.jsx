@@ -8,6 +8,8 @@ import { monthLabel, parseISO, shortDate, weekdayShort } from '../../engine/date
 import { evaluateCaps } from '../../engine/caps.js';
 import { receiptInbox } from '../../engine/receipts.js';
 import { payPlan } from '../../engine/planner.js';
+import ReviewPanel from '../components/ReviewPanel.jsx';
+import { splitTotals } from '../../engine/split.js';
 
 function greeting() {
   const h = new Date().getHours();
@@ -27,6 +29,7 @@ export default function Dashboard({ go }) {
   const leftRatio = s.income > 0 ? s.leftToSpend / s.income : 0;
   const status = !s.income ? { c: 'var(--accent)', t: 'Add your pay under Bills & Income', i: 'i' } : s.leftToSpend < 0 ? { c: 'var(--critical)', t: 'Overspent', i: '⚠' } : leftRatio < 0.1 ? { c: 'var(--warning)', t: 'Running low', i: '◐' } : { c: 'var(--good)', t: 'On track', i: '✓' };
   const selDay = s.days[selected];
+  const owed = useMemo(() => splitTotals(state, today), [state, today]);
   const caps = useMemo(() => evaluateCaps(state, today).filter((c) => c.status !== 'ok'), [state, today]);
   const inbox = useMemo(() => (state.settings.receiptPrompts === false ? [] : receiptInbox(state, today)), [state, today]);
   const plan = useMemo(() => payPlan(state, today, 2), [state, today]);
@@ -65,6 +68,8 @@ export default function Dashboard({ go }) {
         </div>
       )}
 
+      <ReviewPanel />
+
       <div className="dash">
         <section className="dash-col">
           <div className="card hero">
@@ -95,6 +100,11 @@ export default function Dashboard({ go }) {
                   <span className="stat-sub">{s.safeBasis === 'balance' ? 'from bank balance' : 'until month end'}</span>
                 </div>
               )}
+              <button className="stat link" onClick={() => go('planner')}>
+                <span className="stat-label">🪣 Pots</span>
+                <span className="stat-value">{fmt((state.settings.billPot?.balance || 0) + (state.goals || []).reduce((a, g) => a + (g.saved || 0), 0), { decimals: 0 })}</span>
+                <span className="stat-sub">bills {fmt(state.settings.billPot?.balance || 0, { decimals: 0 })}{owed.owedToYou > 0 ? ` · owed to you ${fmt(owed.owedToYou, { decimals: 0 })}` : ''}</span>
+              </button>
               <button className="stat link" onClick={() => go('debts')}>
                 <span className="stat-label">💳 Debts</span>
                 <span className="stat-value">{fmt(s.debtTotal, { decimals: 0 })}</span>

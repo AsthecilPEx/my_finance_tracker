@@ -7,6 +7,7 @@ import { buildOccurrences, scheduleItems } from './summary.js';
 import { monthlyEquivalent, occurrencesBetween } from './recurring.js';
 import { profileSummary, paysPerYear } from './income.js';
 import { round2, sum } from './money.js';
+import { financialView } from './view.js';
 
 function paydayEvents(state, from, to) {
   return buildOccurrences(state, from, to).filter((o) => o.amount > 0 && (o.type === 'payday' || o.type === 'income'));
@@ -14,6 +15,7 @@ function paydayEvents(state, from, to) {
 
 /** The pay period containing `today`, based on the main (largest) income source. */
 export function payWindow(state, today) {
+  state = financialView(state);
   const all = paydayEvents(state, addDays(today, -62), addDays(today, 62));
   if (!all.length) return null;
   const totals = new Map();
@@ -27,6 +29,7 @@ export function payWindow(state, today) {
 
 /** Monthly cost of everything that must be paid regularly (bills, subscriptions, debt minimums). */
 export function monthlyCommitments(state) {
+  state = financialView(state);
   const bills = sum((state.recurring || []).filter((r) => r.active !== false && r.direction === 'out' && !['savings', 'investment'].includes(r.kind)), (r) => monthlyEquivalent(r.amount, r.frequency));
   const debts = sum((state.debts || []).filter((d) => d.balance > 0), (d) => d.minPayment || 0);
   return round2(bills + debts);
@@ -37,6 +40,7 @@ export function goalsPerMonth(state) {
 }
 
 export function payPlan(state, today, count = 8) {
+  state = financialView(state);
   const horizon = addDays(today, 200);
   const pays = paydayEvents(state, addDays(today, 1), horizon);
   // Merge same-day paydays (e.g. two jobs paying on the same Friday).
@@ -111,6 +115,7 @@ export function payPlan(state, today, count = 8) {
 
 /** Months with an extra payday (e.g. 5 Fridays, or 3 fortnightly paydays). */
 export function bonusPaydayMonths(state, today, months = 12) {
+  state = financialView(state);
   const out = [];
   const incomes = scheduleItems(state).filter((r) => r.kind === 'salary' && r.active !== false && ['weekly', 'fortnightly', 'four-weekly'].includes(r.frequency));
   for (const inc of incomes) {
@@ -128,6 +133,7 @@ export function bonusPaydayMonths(state, today, months = 12) {
 
 /** How variable has actual pay been? Uses salary-category transactions from the last 6 months. */
 export function incomeVariability(state, today) {
+  state = financialView(state);
   const since = addDays(today, -183);
   const months = new Map();
   for (const t of state.transactions) {

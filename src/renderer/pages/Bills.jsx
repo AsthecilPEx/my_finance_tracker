@@ -5,6 +5,8 @@ import { RecurringForm } from '../components/Forms.jsx';
 import { detectRecurring, FREQUENCIES, monthlyEquivalent, nextOccurrence } from '../../engine/recurring.js';
 import { shortDate, weekdayShort, daysBetween, ordinal } from '../../engine/dates.js';
 import { profileSummary, describeSchedule, incomeItems } from '../../engine/income.js';
+import { financialView } from '../../engine/view.js';
+import { formatMoney } from '../../engine/money.js';
 
 export default function Bills({ go }) {
   const { state, dispatch, fmt, today, cats, notify } = useApp();
@@ -16,7 +18,8 @@ export default function Bills({ go }) {
     [state.transactions, state.recurring, state.debts, state.rules, today, dismissed],
   );
 
-  const items = state.recurring.map((r) => ({ ...r, next: nextOccurrence(r, today, state.settings.extraHolidays), monthly: monthlyEquivalent(r.amount, r.frequency) }));
+  const view = financialView(state);
+  const items = view.recurring.map((r) => ({ ...r, next: nextOccurrence(r, today, state.settings.extraHolidays), monthly: monthlyEquivalent(r.amount, r.frequency) }));
   const groups = [
     { id: 'in', title: 'Income & paydays', items: items.filter((r) => r.direction === 'in') },
     { id: 'must', title: 'Compulsory bills', hint: 'Must be paid: housing, council tax, utilities, insurance', items: items.filter((r) => r.direction === 'out' && r.compulsory) },
@@ -28,7 +31,7 @@ export default function Bills({ go }) {
   const prof = profileSummary(state);
   const payItems = incomeItems(state);
   const inTotal = total(groups[0].items) + prof.monthly;
-  const mustTotal = total(groups[1].items) + state.debts.filter((d) => d.balance > 0).reduce((s, d) => s + (d.minPayment || 0), 0);
+  const mustTotal = total(groups[1].items) + view.debts.filter((d) => d.balance > 0).reduce((s, d) => s + (d.minPayment || 0), 0);
   const optTotal = total(groups[2].items);
 
   const accept = async (s) => {
@@ -95,12 +98,12 @@ export default function Bills({ go }) {
                     <b>{r.name}</b>
                     <small className="muted"> · {FREQUENCIES[r.frequency]}{r.frequency === 'monthly' ? ` on the ${ordinal(r.dayOfMonth)}` : ''}{r.next ? ` · next ${weekdayShort(r.next)} ${shortDate(r.next)}` : ''}</small>
                   </span>
-                  <b className={r.direction === 'in' ? 'pos' : ''}>{fmt(r.amount)}</b>
+                  <b className={r.direction === 'in' ? 'pos' : ''}>{r.native ? <>{formatMoney(r.native.amount, r.native.currency)} <small className="muted">≈ {fmt(r.amount)}</small></> : fmt(r.amount)}</b>
                   <label className="switch" title={active(r) ? 'Active' : 'Paused'}>
-                    <input type="checkbox" checked={active(r)} onChange={(e) => dispatch({ type: 'recurring/save', payload: { id: r.id, active: e.target.checked, amount: r.amount } })} />
+                    <input type="checkbox" checked={active(r)} onChange={(e) => dispatch({ type: 'recurring/save', payload: { id: r.id, active: e.target.checked, amount: r.native?.amount ?? r.amount } })} />
                     <span />
                   </label>
-                  <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(r)}>✎</button>
+                  <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.recurring.find((x) => x.id === r.id))}>✎</button>
                   <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'recurring/delete', payload: { id: r.id } })}>🗑</button>
                 </li>
               ))}

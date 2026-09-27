@@ -5,6 +5,7 @@ import Modal from './Modal.jsx';
 import { TIERS, SECTIONS, parseReceiptText, suggestTier, receiptSectionFor, normaliseItem } from '../../engine/receipts.js';
 import { newId } from '../../engine/state.js';
 import { shortDate } from '../../engine/dates.js';
+import { myAmount } from '../../engine/split.js';
 
 export function TierPicker({ value, onChange }) {
   return (
@@ -63,7 +64,7 @@ export default function ReceiptEditor({ txn, onClose }) {
   };
 
   const upd = (id, patch) => setItems((cur) => cur.map((it) => (it.id === id ? { ...it, ...patch } : it)));
-  const total = -txn.amount;
+  const total = -myAmount(txn); // for a split bill, only your share is itemised
   const itemsTotal = Math.round(items.reduce((s, i) => s + (+i.price || 0), 0) * 100) / 100;
   const gap = Math.round((total - itemsTotal) * 100) / 100;
 
@@ -78,7 +79,7 @@ export default function ReceiptEditor({ txn, onClose }) {
     <Modal title={`🧾 ${txn.description}`} wide onClose={onClose}>
       <div className="receipt-top">
         <div>
-          <div className="muted sm">{shortDate(txn.date)} · {SECTIONS[section]?.label}</div>
+          <div className="muted sm">{shortDate(txn.date)} · {SECTIONS[section]?.label}{txn.split?.owed > 0 ? ` · your share of ${fmt(-txn.amount)}` : ''}</div>
           <div className="receipt-total">{fmt(total)}</div>
         </div>
         <div className="receipt-photo">

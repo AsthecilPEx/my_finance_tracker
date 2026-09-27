@@ -105,7 +105,7 @@ export default function AIPlan() {
           <ul className="list">
             {state.planHistory.map((h) => (
               <li key={h.id} className="list-row">
-                <span className="grow"><b>{h.title}</b><small className="muted"> · {new Date(h.appliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {h.changes} changes{h.undone ? ' · undone' : ''}</small>{h.tips?.length > 0 && <div className="muted sm">💡 {h.tips[0]}</div>}</span>
+                <span className="grow"><b>{h.title}</b><small className="muted"> · {new Date(h.appliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {h.changes} changes{h.undone ? ' · undone' : ''}{h.superseded ? ' · replaced by a newer version' : ''}</small>{h.tips?.length > 0 && <div className="muted sm">💡 {h.tips[0]}</div>}</span>
                 {!h.undone && h.before && <button className="btn ghost sm" onClick={() => { dispatch({ type: 'plan/undo', payload: { id: h.id } }); notify('Plan undone: budgets, caps, goals and pauses restored', 'good'); }}>Undo</button>}
               </li>
             ))}

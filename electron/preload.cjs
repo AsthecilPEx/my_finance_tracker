@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('pulse', {
     ocr: (file) => invoke('receipt:ocr', file),
   },
   plan: { openFile: () => invoke('plan:openFile') },
+  fx: { refresh: () => invoke('fx:refresh') },
   bank: {
     info: () => invoke('bank:info'),
     pickKey: () => invoke('bank:pickKey'),

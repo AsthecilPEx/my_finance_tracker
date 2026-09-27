@@ -5,6 +5,7 @@ import { categoryMap, SPENDING_TYPES } from './categories.js';
 import { receiptLines, TIERS, SECTIONS } from './receipts.js';
 import { payWindow } from './planner.js';
 import { round2, sum } from './money.js';
+import { financialView } from './view.js';
 
 export const CAP_PERIODS = { month: 'per month', week: 'per week', payperiod: 'per pay period' };
 
@@ -29,6 +30,7 @@ export function describeCap(cap, cats) {
 }
 
 export function evaluateCaps(state, today) {
+  state = financialView(state);
   const cats = categoryMap(state.categories);
   const lines = (state.caps || []).some((c) => c.scope === 'tier' || c.scope === 'section') ? receiptLines(state) : [];
   return (state.caps || []).filter((c) => c.active !== false && c.amount > 0).map((cap) => {

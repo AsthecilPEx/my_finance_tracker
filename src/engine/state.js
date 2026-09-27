@@ -3,6 +3,7 @@ import { round2 } from './money.js';
 import { daysBetween } from './dates.js';
 import { normaliseItem } from './receipts.js';
 import { applyPlan, undoPlan } from './aiplan.js';
+import { toBase, baseCurrency, rateFor } from './fx.js';
 
 export const STATE_VERSION = 2;
 
@@ -42,6 +43,9 @@ export function createEmptyState() {
     // Reserved for V3 (brokerage, crypto, SIP/SWP connectors). Kept in the schema so data
     // written by later versions survives a round trip through this one.
     portfolio: { holdings: [], connectors: [] },
+    fx: null,
+    potLog: [],
+    reviewDismissed: [],
   };
 }
 
@@ -98,8 +102,10 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
   const seen = new Map();
   const added = [];
   let duplicates = 0;
-  for (const row of rows) {
+  const base = baseCurrency(state);
+  for (let row of rows) {
     if (row.externalId && external.has(row.externalId)) { duplicates++; continue; }
+    if (row.currency && row.currency !== base) row = foreignRow(state, row);
     const base = importKey(row);
     const n = (seen.get(base) || 0) + 1;
     seen.set(base, n);
@@ -115,6 +121,7 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
       account: row.account || '',
       importKey: key,
       externalId: row.externalId,
+      ...(row.original ? { original: row.original } : {}),
       createdAt: new Date().toISOString(),
     });
   }
@@ -124,6 +131,12 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
     ...(state.imports || []),
   ].slice(0, 50);
   return { state: { ...state, transactions, imports }, added: added.length, duplicates };
+}
+
+/** A row in another currency: store the base-currency amount at today's rate and keep the original. */
+function foreignRow(state, row) {
+  const rate = rateFor(state.fx, row.currency, baseCurrency(state));
+  return { ...row, amount: toBase(row.amount, row.currency, state), original: { amount: row.amount, currency: row.currency, rate: rate || null } };
 }
 
 const upsert = (list, item) => {
@@ -142,7 +155,9 @@ export function reduce(state, action) {
       return { ...state, settings: { ...state.settings, ...p, widget: { ...state.settings.widget, ...(p.widget || {}) }, bank: { ...state.settings.bank, ...(p.bank || {}) } } };
 
     case 'txn/add': {
-      const t = { id: newId(), source: 'manual', createdAt: new Date().toISOString(), ...p, amount: round2(p.amount) };
+      const { currency, ...rest } = p;
+      const fx = currency && currency !== baseCurrency(state) ? foreignRow(state, { ...rest, currency }) : rest;
+      const t = { id: newId(), source: 'manual', createdAt: new Date().toISOString(), ...fx, amount: round2(fx.amount) };
       if (!t.categoryId) t.categoryId = categorise(t.description, t.amount, state.rules);
       return { ...state, transactions: [t, ...state.transactions].sort((a, b) => b.date.localeCompare(a.date)) };
     }
@@ -190,6 +205,32 @@ export function reduce(state, action) {
       };
     case 'rule/delete':
       return { ...state, rules: state.rules.filter((r) => r.id !== p.id) };
+
+    // ---- split bills
+    case 'txn/split':
+      return { ...state, transactions: state.transactions.map((t) => (t.id === p.id ? (p.split ? { ...t, split: { ...p.split, owed: round2(Math.min(-t.amount, Math.max(0, +p.split.owed || 0))) } } : (({ split, ...rest }) => rest)(t)) : t)) };
+    case 'split/settle':
+      return { ...state, transactions: state.transactions.map((t) => (t.id === p.incomingId ? { ...t, settles: (p.allocations || []).filter((a) => a.amount > 0).map((a) => ({ txnId: a.txnId, amount: round2(+a.amount) })), categoryId: 'split_back', reviewed: true, manualCategory: true } : t)) };
+    case 'split/unsettle':
+      return { ...state, transactions: state.transactions.map((t) => (t.id === p.incomingId ? (({ settles, ...rest }) => ({ ...rest, categoryId: categorise(t.description, t.amount, state.rules), manualCategory: false }))(t) : t)) };
+    case 'split/writeOff':
+      return { ...state, transactions: state.transactions.map((t) => (t.id === p.id && t.split ? { ...t, split: { ...t.split, writtenOff: round2(+p.amount || 0) } } : t)) };
+
+    // ---- review queue ("needs your attention")
+    case 'txn/review': {
+      const ids = new Set(p.ids);
+      return { ...state, transactions: state.transactions.map((t) => (ids.has(t.id) ? { ...t, reviewed: true, ...(p.categoryId ? { categoryId: p.categoryId, manualCategory: true } : {}) } : t)) };
+    }
+    case 'review/dismiss':
+      return { ...state, reviewDismissed: [...new Set([...(state.reviewDismissed || []), p.key])].slice(-1000) };
+
+    // ---- currencies and pots
+    case 'fx/set':
+      return { ...state, fx: p };
+    case 'pot/move': {
+      const balance = round2((+state.settings.billPot?.balance || 0) + (+p.amount || 0));
+      return { ...state, settings: { ...state.settings, billPot: { ...state.settings.billPot, balance } }, potLog: [{ id: newId(), at: new Date().toISOString(), amount: round2(+p.amount), note: p.note || '', balance }, ...(state.potLog || [])].slice(0, 200) };
+    }
 
     case 'profile/update':
       return { ...state, profile: { ...state.profile, ...p } };

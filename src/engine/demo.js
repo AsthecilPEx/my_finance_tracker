@@ -36,7 +36,7 @@ export function createDemoState(today) {
     name: 'Sam',
     region: 'ruk',
     incomes: [
-      newIncome({ id: 'inc-main', name: 'Acme Ltd salary', employer: 'acme', payType: 'salary', annual: 48000, pensionPct: 5, schedule: { frequency: 'monthly', dayOfMonth: 25, weekday: 5, adjust: 'previous-working' } }),
+      newIncome({ id: 'inc-main', name: 'Acme Ltd salary', employer: 'acme', payType: 'salary', annual: 54000, pensionPct: 5, schedule: { frequency: 'monthly', dayOfMonth: 25, weekday: 5, adjust: 'previous-working' } }),
       newIncome({ id: 'inc-bar', name: 'Weekend bar shifts', employer: 'crown', payType: 'hourly', hourlyRate: 12.6, hoursPerWeek: 10, taxCode: 'BR', pensionPct: 0, variable: true, lowestNet: 85, schedule: { frequency: 'weekly', weekday: 5, adjust: 'none' } }),
     ],
   };
@@ -62,11 +62,12 @@ export function createDemoState(today) {
   state.debts = [
     { id: newId(), name: 'Barclaycard', type: 'credit-card', lender: 'Barclaycard', match: 'barclaycard', balance: 2340, originalBalance: 3100, apr: 24.9, minPayment: 70, dueDay: 15 },
     { id: newId(), name: 'Car finance', type: 'car-finance', lender: 'Black Horse', match: 'black horse', balance: 6800, originalBalance: 11500, apr: 7.9, minPayment: 245, dueDay: 28 },
+    { id: newId(), name: 'HDFC home loan (India)', type: 'mortgage', lender: 'HDFC', match: 'hdfc', currency: 'INR', balance: 1850000, originalBalance: 2500000, apr: 8.75, minPayment: 25000, dueDay: 5 },
     { id: newId(), name: 'Klarna – sofa', type: 'bnpl', lender: 'Klarna', match: 'klarna', balance: 180, originalBalance: 360, apr: 0, minPayment: 60, dueDay: 9 },
   ];
 
   const rows = [];
-  const add = (date, amount, description) => { if (date <= today) rows.push({ date, amount, description }); };
+  const add = (date, amount, description, account = 'Barclays Current') => { if (date <= today) rows.push({ date, amount, description, account }); };
   const descFor = {
     openrent: 'OPENRENT RENT SO', 'council tax': 'LB CAMDEN COUNCIL TAX DD', octopus: 'OCTOPUS ENERGY DD',
     admiral: 'ADMIRAL INSURANCE DD', 'thames water': 'THAMES WATER DD', vodafone: 'VODAFONE LTD DD', 'virgin media': 'VIRGIN MEDIA DD',
@@ -87,7 +88,9 @@ export function createDemoState(today) {
   }
   for (const debt of state.debts) {
     for (const d of occurrencesBetween({ frequency: 'monthly', dayOfMonth: debt.dueDay, startDate: start }, start, today)) {
-      add(d, -debt.minPayment, `${debt.lender.toUpperCase()} PAYMENT`);
+      // An EMI paid abroad leaves the UK account in pounds, at that day's rate plus a transfer fee.
+      if (debt.currency === 'INR') add(d, -(Math.round((debt.minPayment / between(111, 115) + 1.2) * 100) / 100), 'WISE HDFC HOME LOAN EMI');
+      else add(d, -debt.minPayment, `${debt.lender.toUpperCase()} PAYMENT`);
     }
   }
 
@@ -106,6 +109,11 @@ export function createDemoState(today) {
     if (dow === 0 && r() < 0.5) add(d, -between(48, 62), pick(['SHELL CAMDEN', 'BP CONNECT', 'ESSO']));
     if (r() < 0.035) add(d, -between(11, 28), pick(['ODEON CINEMAS', 'VUE CINEMA', 'TICKETMASTER']));
   }
+  // A shared house shop (split with flatmates), a partial repayment and a transfer between own accounts.
+  add(addDays(today, -9), -96.4, 'TESCO EXTRA WEMBLEY');
+  add(addDays(today, -3), 32.13, 'J PATEL');
+  add(addDays(today, -6), -250, 'MONZO S KHAN');
+  add(addDays(today, -6), 250, 'BARCLAYS S KHAN', 'Monzo');
   // A big one-off this month so the "unusual purchase" insight has something to show.
   add(addDays(monthStartOfToday, 2), -449, 'CURRYS PC WORLD');
   let out = mergeRows(state, rows, 'demo').state;
@@ -128,7 +136,28 @@ export function createDemoState(today) {
     if (left > 0 && items.length) items[items.length - 1].price = Math.round((items[items.length - 1].price + left) * 100) / 100;
     receipts.push({ id: newId(), txnId: t.id, date: t.date, merchant: t.description, total: -t.amount, section: 'groceries', items, createdAt: t.date });
   }
+  // Itemise some takeaways too so the Food section has history.
+  const FOOD = [['Chicken Burger Meal', 9.5], ['Large Fries', 3.2], ['Soft Drink', 2.4], ['Dessert', 4.5], ['Delivery Fee', 2.99], ['Curry', 11.5], ['Naan', 3.2], ['Rice', 3.5]];
+  for (const t of out.transactions) {
+    if (t.categoryId !== 'eating_out' || t.date > addDays(today, -6) || r() < 0.5) continue;
+    const items = [];
+    let left = -t.amount;
+    while (left > 1) {
+      const [name, price] = pick(FOOD);
+      const p = Math.min(left, price);
+      items.push({ id: newId(), name, qty: 1, price: p, tier: /dessert|drink|fries|fee/i.test(name) ? 'low' : 'moderate', section: 'food' });
+      left = Math.round((left - p) * 100) / 100;
+    }
+    if (left > 0 && items.length) items[items.length - 1].price = Math.round((items[items.length - 1].price + left) * 100) / 100;
+    receipts.push({ id: newId(), txnId: t.id, date: t.date, merchant: t.description, total: -t.amount, section: 'food', items, createdAt: t.date });
+  }
   out = { ...out, receipts };
+  // Demo exchange rates (the desktop app replaces these with live rates on launch).
+  const monthAgo = addDays(today, -30);
+  out.fx = { base: 'GBP', date: today, rates: { INR: 112.35, EUR: 1.168, USD: 1.342, AED: 4.93, PKR: 377.1 }, source: 'demo rates', fetchedAt: null, history: { [monthAgo]: { INR: 114.2 }, [today]: { INR: 112.35 } } };
+  out.settings = { ...out.settings, watchCurrencies: ['INR', 'EUR', 'USD'] };
+  const shop = out.transactions.find((t) => t.description === 'TESCO EXTRA WEMBLEY');
+  if (shop) shop.split = { owed: 64.27, who: 'Flatmates (Jay & Sara)', expectedBy: addDays(today, -2), trackedElsewhere: true, note: 'House shop, split 3 ways' };
   out.caps = [
     { id: newId(), name: 'Treats in the weekly shop', scope: 'tier', tier: 'low', section: 'groceries', amount: 30, period: 'month', alertAt: 0.8, active: true },
     { id: newId(), name: 'Coffee runs', scope: 'category', categoryId: 'coffee', amount: 15, period: 'week', alertAt: 0.8, active: true },

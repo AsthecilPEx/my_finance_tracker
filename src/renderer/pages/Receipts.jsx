@@ -61,7 +61,9 @@ export default function Receipts() {
               {[['all', 'All'], ...Object.entries(SECTIONS).map(([k, s]) => [k, s.label.split(' ')[0]])].map(([k, l]) => <button key={k} className={section === k ? 'on in' : ''} onClick={() => setSection(k)}>{l}</button>)}
             </div>
           </div>
-          {b.receiptsCount === 0 ? <p className="empty">Trends appear after a few itemised receipts.</p> : (
+          {b.receiptsCount === 0 ? <p className="empty">Trends appear after a few itemised receipts.</p> : rows.every((r) => !(r.essential || r.moderate || r.low)) ? (
+            <p className="empty">No itemised {SECTIONS[section]?.label.toLowerCase()} purchases yet. When you itemise a receipt, set its section to "{SECTIONS[section]?.label}" and the trend appears here.</p>
+          ) : (
             <GroupedBars rows={rows} series={Object.entries(TIERS).map(([k, t]) => ({ key: k, name: t.label, color: t.color }))} format={money0} />
           )}
         </div>

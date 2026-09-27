@@ -138,11 +138,12 @@ export function matchOccurrences(occurrences, transactions) {
     let bestGap = Infinity;
     for (const t of transactions) {
       if (used.has(t.id)) continue;
-      if (Math.sign(t.amount) !== Math.sign(occ.amount)) continue;
+      const amt = t.rawAmount ?? t.amount; // a split bill still leaves the bank in full
+      if (Math.sign(amt) !== Math.sign(occ.amount)) continue;
       const gap = Math.abs(daysBetween(occ.date, t.date));
       if (gap > 5) continue;
       const tolerance = Math.max(1, Math.abs(occ.amount) * 0.15);
-      const amountOk = Math.abs(Math.abs(t.amount) - Math.abs(occ.amount)) <= tolerance;
+      const amountOk = Math.abs(Math.abs(amt) - Math.abs(occ.amount)) <= tolerance;
       const desc = (t.description || '').toLowerCase();
       const textOk = t.recurringId === occ.sourceId || words.some((w) => desc.includes(w));
       if (!textOk || (!amountOk && t.recurringId !== occ.sourceId)) continue;

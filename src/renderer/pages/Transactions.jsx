@@ -5,6 +5,9 @@ import { TxnForm } from '../components/Forms.jsx';
 import { shortDate } from '../../engine/dates.js';
 import ReceiptEditor from '../components/ReceiptEditor.jsx';
 import { ITEMISABLE } from '../../engine/receipts.js';
+import { SplitModal, SettleModal } from '../components/Split.jsx';
+import { myAmount, openSplits } from '../../engine/split.js';
+import { formatMoney } from '../../engine/money.js';
 
 const PAGE = 100;
 
@@ -16,6 +19,9 @@ export default function Transactions({ go }) {
   const [edit, setEdit] = useState(null);
   const [limit, setLimit] = useState(PAGE);
   const [receipt, setReceipt] = useState(null);
+  const [splitTxn, setSplitTxn] = useState(null);
+  const [settleTxn, setSettleTxn] = useState(null);
+  const hasOpenSplits = useMemo(() => openSplits(state).some((s) => s.outstanding > 0.005), [state]);
   const itemised = useMemo(() => new Map((state.receipts || []).map((r) => [r.txnId, r.items.length])), [state.receipts]);
 
   const months = useMemo(() => [...new Set(state.transactions.map((t) => t.date.slice(0, 7)))].sort().reverse(), [state.transactions]);
@@ -54,7 +60,7 @@ export default function Transactions({ go }) {
       <div className="card flush">
         {list.length === 0 ? <p className="empty">No transactions match.</p> : (
           <table className="table txns">
-            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th className="num">Amount</th><th /></tr></thead>
+            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th className="num">Amount</th><th className="center" title="Shared payment: part of it will be paid back to you">Split</th><th /></tr></thead>
             <tbody>
               {list.slice(0, limit).map((t) => (
                 <tr key={t.id}>
@@ -71,7 +77,22 @@ export default function Transactions({ go }) {
                       {state.categories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                     </select>
                   </td>
-                  <td className={`num ${t.amount > 0 ? 'pos' : ''}`}>{fmt(t.amount, { sign: true })}</td>
+                  <td className={`num ${t.amount > 0 ? 'pos' : ''}`}>
+                    {t.split?.owed > 0 ? (
+                      <><span className="struck">{fmt(t.amount)}</span><div className="share">your share {fmt(myAmount(t))}</div></>
+                    ) : fmt(t.amount, { sign: true })}
+                    {t.original && <div className="muted xs">{formatMoney(t.original.amount, t.original.currency)}</div>}
+                  </td>
+                  <td className="center">
+                    {t.amount < 0 ? (
+                      <label className="switch sm" title={t.split ? 'Edit split' : 'Mark as a shared payment'}>
+                        <input type="checkbox" checked={!!t.split} onChange={() => setSplitTxn(t)} aria-label="Split" />
+                        <span />
+                      </label>
+                    ) : (t.settles || hasOpenSplits) ? (
+                      <button className={`receipt-btn ${t.settles ? 'done' : ''}`} onClick={() => setSettleTxn(t)} title="Link this money to split payments it pays back">🤝 {t.settles ? 'Linked' : 'Link'}</button>
+                    ) : null}
+                  </td>
                   <td className="num"><button className="icon-btn danger" title="Delete" aria-label="Delete" onClick={() => dispatch({ type: 'txn/delete', payload: { id: t.id } })}>🗑</button></td>
                 </tr>
               ))}
@@ -80,6 +101,8 @@ export default function Transactions({ go }) {
         )}
         {list.length > limit && <div className="more-row"><button className="btn ghost" onClick={() => setLimit((l) => l + PAGE)}>Show more ({list.length - limit} left)</button></div>}
       </div>
+      {splitTxn && <SplitModal txn={splitTxn} onClose={() => setSplitTxn(null)} />}
+      {settleTxn && <SettleModal incoming={settleTxn} onClose={() => setSettleTxn(null)} />}
       {receipt && <ReceiptEditor txn={receipt} onClose={() => setReceipt(null)} />}
       {edit && <Modal title={edit.id ? 'Edit transaction' : 'Add transaction'} onClose={() => setEdit(null)}><TxnForm initial={edit.id ? edit : null} onDone={() => setEdit(null)} /></Modal>}
     </div>

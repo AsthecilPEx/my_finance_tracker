@@ -7,6 +7,7 @@ import { EVENT_TYPES, compactMoney } from '../components/events.js';
 import { payPlan, bonusPaydayMonths, incomeVariability } from '../../engine/planner.js';
 import { profileSummary, describeSchedule } from '../../engine/income.js';
 import { shortDate, weekdayShort, daysBetween, parseISO } from '../../engine/dates.js';
+import { splitTotals } from '../../engine/split.js';
 
 export default function Planner({ go }) {
   const { state, today, fmt, currency } = useApp();
@@ -93,8 +94,18 @@ export default function Planner({ go }) {
         </div>
       </div>
 
+      <Pots plan={plan} prof={prof} go={go} />
+
       <div className="card">
-        <div className="card-head"><h3>🗓️ Next pay periods</h3><span className="muted sm">Each row runs from one payday to the day before the next</span></div>
+        <div className="card-head"><h3>🗓️ Next pay periods</h3></div>
+        <ul className="explain">
+          <li><b>Period</b>: from a payday up to the day before your next one. "Now" is today until your next pay.</li>
+          <li><b>Pay in</b>: what lands on that payday (planned at your lowest pay if it varies).</li>
+          <li><b>Bills due</b>: every bill, subscription and debt payment falling in that period.</li>
+          <li><b>Bills pot after</b>: what's left in your bills pot once those bills are paid, if you follow the routine. It should never go below £0.</li>
+          <li><b>Spending money</b>: your steady allowance for those days ({fmt(plan.allowancePerDay, { decimals: 0 })} × number of days).</li>
+        </ul>
+        <div className="period-head" aria-hidden><span>Period</span><span>Pay in</span><span>Bills due</span><span>Bills pot after · spending</span></div>
         <div className="periods">
           {plan.periods.map((p) => (
             <div key={p.from} className={`period ${p.current ? 'current' : ''}`}>
@@ -111,8 +122,8 @@ export default function Planner({ go }) {
                 {p.shortWithoutPot > 0 && potOn && <div className="warn-line">Paid straight from this pay you'd be {fmt(p.shortWithoutPot, { decimals: 0 })} short. The pot covers it.</div>}
               </div>
               <div className="period-pots">
-                <span title="Bills pot after this period">🪣 {fmt(p.potAfter, { decimals: 0 })}</span>
-                <span className="muted sm">spend {fmt(p.allowance, { decimals: 0 })}</span>
+                <span title="Bills pot balance after this period's bills">🪣 {fmt(p.potAfter, { decimals: 0 })} <small className="muted">in pot</small></span>
+                <span className="muted sm">{fmt(p.allowance, { decimals: 0 })} to spend</span>
               </div>
             </div>
           ))}
@@ -187,5 +198,53 @@ function GoalModal({ goal, onClose }) {
         </div>
       </form>
     </Modal>
+  );
+}
+
+/** Where the money you've set aside actually is: the bills pot, goal pots and money owed to you. */
+function Pots({ plan, prof, go }) {
+  const { state, dispatch, fmt, today, notify } = useApp();
+  const [amount, setAmount] = useState('');
+  const balance = state.settings.billPot?.balance || 0;
+  const owed = splitTotals(state, today);
+  const suggested = prof.sources.map((s) => ({ name: s.inc.name, amount: Math.round(s.plannedPerPay * plan.billsShare * 100) / 100 })).filter((x) => x.amount > 0);
+  const move = (amt, note) => { dispatch({ type: 'pot/move', payload: { amount: amt, note } }); notify(`${amt > 0 ? 'Added' : 'Took'} ${fmt(Math.abs(amt))} ${amt > 0 ? 'to' : 'from'} your bills pot`, 'good'); setAmount(''); };
+  return (
+    <div className="card">
+      <div className="card-head"><h3>🪣 Your pots</h3><span className="muted sm">Money set aside, and where it is</span></div>
+      <div className="pots">
+        <div className="pot">
+          <span className="muted sm">Bills pot</span>
+          <span className="pot-amount">{fmt(balance)}</span>
+          <span className={`sm ${balance >= plan.startingBuffer ? 'pos' : 'muted'}`}>{balance >= plan.startingBuffer ? '✓ enough to cover upcoming bills' : `${fmt(plan.startingBuffer - balance, { decimals: 0 })} short of the buffer you need`}</span>
+          <div className="inline-row">
+            {suggested.map((s) => <button key={s.name} className="btn primary sm" onClick={() => move(s.amount, `${s.name} payday`)}>+{fmt(s.amount, { decimals: 0 })} ({s.name.split(' ')[0]})</button>)}
+          </div>
+          <div className="inline-row">
+            <input type="number" min="0" step="0.01" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ width: 110 }} />
+            <button className="btn ghost sm" disabled={!(+amount > 0)} onClick={() => move(+amount, 'Moved in')}>I moved it in</button>
+            <button className="btn ghost sm" disabled={!(+amount > 0)} onClick={() => move(-amount, 'Paid a bill')}>Paid a bill from it</button>
+          </div>
+          {(state.potLog || []).length > 0 && (
+            <details className="muted sm"><summary>History</summary>
+              <ul className="list compact">{state.potLog.slice(0, 8).map((l) => <li key={l.id} className="list-row"><span className="grow">{new Date(l.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · {l.note}</span><span className={l.amount > 0 ? 'pos' : ''}>{fmt(l.amount, { sign: true })}</span></li>)}</ul>
+            </details>
+          )}
+        </div>
+        {(state.goals || []).map((g) => (
+          <div key={g.id} className="pot">
+            <span className="muted sm">{g.icon || '🎯'} {g.name}</span>
+            <span className="pot-amount">{fmt(g.saved || 0, { decimals: 0 })}</span>
+            <span className="muted sm">of {fmt(g.target, { decimals: 0 })} · goal pot</span>
+          </div>
+        ))}
+        <button className="pot linkish" onClick={() => go('transactions')}>
+          <span className="muted sm">🤝 Owed to you (split bills)</span>
+          <span className="pot-amount">{fmt(owed.owedToYou)}</span>
+          <span className="muted sm">{owed.open} open{owed.overdue ? ` · ${owed.overdue} overdue` : ''}</span>
+        </button>
+      </div>
+      <p className="muted xs">Pulse can't see inside your bank's pots, so record moves here (or keep the balance in step in Settings). Bank-connected pots show under Bank Sync.</p>
+    </div>
   );
 }

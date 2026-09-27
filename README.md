@@ -15,6 +15,10 @@ A friendly personal finance app for Windows, built around **your** paydays. You 
 | **Receipts and item importance** | When a supermarket or shopping payment comes in (Aldi, Lidl, Tesco and so on), Pulse offers to itemise it. Snap a **photo of the receipt**, read by OCR **fully offline** on your PC, or type lines like `milk 1.45` / `2 x chicken @ 2.85`. Each item is rated **Essential**, **Moderately important** or **Not so important**, and put in a **Groceries**, **General** or **Food out** section. Pulse learns from your choices, then shows monthly trends by importance and your top "not so important" buys. |
 | **Spend caps with alerts** | Cap a category, an importance tier ("not-so-important groceries ≤ £30/month"), a receipt section or all spending, **per month, week or pay period**. Pulse warns you on the dashboard, the widget and through Windows notifications when you reach a threshold you choose, and again when you go over. |
 | **AI plan: bring your own assistant** | Copy a ready-made prompt with an anonymised summary of your finances into ChatGPT, Claude, Gemini or Copilot. Its reply contains a strict **Pulse Plan** JSON. Paste it back: Pulse validates it, shows every change with a checkbox (budgets, caps, savings goals, debt strategy, subscriptions to pause, bills pot), applies only what you tick, and keeps an **undo** history. |
+| **Split bills** | Flip **Split** on any payment you made for others (the house shop, a group dinner). Say how much comes back, from whom and by when (optional), and whether it's on **Splitwise**. Only **your share** counts in your spending, categories, caps and receipts. When the money arrives, link it to one or more splits, including partial payments. Repayments are never counted as income. |
+| **Any currency, live rates** | Bills, debts and EMIs can be in any currency, e.g. an Indian home loan in ₹. Pulse downloads daily reference rates (ECB via Frankfurter, with ExchangeRate-API as fallback) every time it runs. It re-converts every total, forecast and insight, and tells you when a rate change makes a bill cost more ("your ₹25,000 EMI costs £3.60 more than last month"). |
+| **Needs your attention** | A dedicated dashboard panel for questions only you can answer. Is this a **transfer between your own accounts** (so it isn't counted as money in)? What is this money in: income, a transfer or a split repayment? Which category does this belong to? Has an overdue split been paid? |
+| **Pots** | See your bills pot, goal pots and money owed to you in one place, and record moves with one click using the amounts from your payday routine. |
 | **Everything from v1** | Glowing category meters, payday calendar, bills (compulsory vs optional), auto-detected subscriptions, debts with avalanche/snowball planning, insights, desktop widget, tray and reminders. |
 
 <p>
@@ -49,9 +53,17 @@ Every push to `main` and every pull request runs the *Build Windows app* workflo
 npm install
 npm start          # build the UI and launch
 npm run dist       # Windows installer + portable exe in release/
-npm test           # 37 engine and connector tests
+npm test           # 48 engine, connector and security tests
 npm run dev        # hot-reload development
 ```
+
+## Security
+
+- **One way out to the internet.** All network traffic goes through a single gateway in the background process. It allows HTTPS only, to an allow-list of services (Enable Banking and the two exchange-rate providers). It follows redirects only to allowed hosts and enforces timeouts and response-size limits. TLS certificates are checked by Chromium against Windows' certificate store.
+- **The UI is offline.** Its web requests are blocked except local app files and bank logos, it runs in a sandbox with no Node.js, all web permissions (camera, notifications, etc.) are denied, and it has a strict Content-Security-Policy.
+- **Tamper-resistant build.** Electron fuses disable running the app as plain Node, `NODE_OPTIONS` injection and debugger attachment, and only load code from the signed app archive.
+- **Secrets encrypted** with Windows DPAPI. Receipt photos are referenced by random IDs only (path traversal is blocked).
+- No software can honestly promise to be attack-proof. Keep Windows updated, and code-sign the installer before sharing it widely.
 
 ## Your data and privacy
 

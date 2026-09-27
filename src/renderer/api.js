@@ -77,6 +77,7 @@ export const api = desktop || {
     image: async (file) => file,
   },
   plan: { openFile: () => pickFile('.json,.txt,.md,text/plain') },
+  fx: { refresh: unsupported },
   exportBackup: async (state) => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');

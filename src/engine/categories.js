@@ -28,6 +28,7 @@ export const DEFAULT_CATEGORIES = [
   { id: 'cash', name: 'Cash Withdrawals', icon: '💷', color: PALETTE[3], type: 'lifestyle', budget: 0 },
   { id: 'other', name: 'Other', icon: '📦', color: '#8a8a94', type: 'lifestyle', budget: 0 },
   { id: 'transfer', name: 'Transfers', icon: '🔁', color: '#8a8a94', type: 'transfer', budget: 0 },
+  { id: 'split_back', name: 'Split repayments', icon: '🤝', color: '#8a8a94', type: 'transfer', budget: 0 },
   { id: 'salary', name: 'Salary', icon: '💼', color: PALETTE[2], type: 'income', budget: 0 },
   { id: 'income_other', name: 'Other Income', icon: '💰', color: PALETTE[2], type: 'income', budget: 0 },
 ];
@@ -38,7 +39,7 @@ export const KEYWORD_RULES = [
   ['income_other', ['refund', 'cashback', 'interest paid', 'dividend', 'hmrc', 'tax rebate']],
   ['transfer', ['transfer to', 'transfer from', 'to pot', 'from pot', 'savings pot', 'internal transfer', 'own account', 'topup', 'top-up', 'top up']],
   ['savings', ['vanguard', 'trading 212', 'freetrade', 'moneybox', 'chip ', 'plum ', 'isa ', 'premium bonds', 'ns&i', 'nutmeg', 'hl.co.uk', 'hargreaves']],
-  ['debt', ['barclaycard', 'amex', 'american express', 'capital one', 'mbna', 'credit card', 'loan repayment', 'black horse', 'klarna', 'clearpay', 'paypal credit', 'student loan', 'zopa', 'finance payment', 'car finance', 'novuna', 'tesco bank']],
+  ['debt', ['barclaycard', 'amex', 'american express', 'capital one', 'mbna', 'credit card', 'loan repayment', 'black horse', 'klarna', 'clearpay', 'paypal credit', 'student loan', 'zopa', 'finance payment', 'car finance', 'novuna', 'tesco bank', 'emi', 'loan emi', 'hdfc', 'icici', 'sbi loan', 'bajaj finserv']],
   ['housing', ['rent', 'mortgage', 'letting', 'landlord', 'openrent', 'service charge', 'ground rent', 'housing association']],
   ['utilities', ['council tax', 'british gas', 'octopus', 'edf', 'e.on', 'eon next', 'ovo', 'scottish power', 'sse ', 'bulb', 'thames water', 'severn trent', 'anglian water', 'united utilities', 'yorkshire water', 'southern water', 'tv licence', 'tv licensing', 'vodafone', ' ee ', 'ee limited', 'o2 ', 'three.co', 'three uk', 'giffgaff', 'bt group', 'btgroup', 'sky digital', 'sky uk', 'virgin media', 'plusnet', 'talktalk', 'hyperoptic', 'community fibre', 'electric', 'energy']],
   ['insurance', ['insurance', 'aviva', 'admiral', 'direct line', 'churchill', 'axa', 'lv=', 'hastings', 'legal & general', 'vitality', 'bupa', 'petplan']],

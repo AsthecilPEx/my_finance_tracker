@@ -1,7 +1,7 @@
 {
   "name": "pulse-finance",
   "productName": "Pulse Finance",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A smart personal finance tracker for Windows: category meters, payday calendar, bills, debts, insights and a desktop widget.",
   "author": "Pulse Finance",
   "license": "MIT",
@@ -58,7 +58,14 @@
       "node_modules/tesseract.js/**",
       "node_modules/tesseract.js-core/**",
       "node_modules/@tesseract.js-data/**"
-    ]
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "enableCookieEncryption": true
+    }
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
