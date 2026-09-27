@@ -3,6 +3,7 @@
 // which owns the data file, the watched folder and the bank connection.
 // In a plain browser (npm run dev:web) we fall back to localStorage so the UI still works.
 import { reduce, migrate, createEmptyState } from '../engine/state.js';
+import { FEEDBACK_EMAIL } from '../config.js';
 
 const desktop = typeof window !== 'undefined' ? window.pulse : undefined;
 export const isDesktop = !!desktop;
@@ -78,6 +79,10 @@ export const api = desktop || {
   },
   plan: { openFile: () => pickFile('.json,.txt,.md,text/plain') },
   fx: { refresh: unsupported },
+  updates: { status: async () => ({ state: 'unsupported', reason: 'web' }), check: async () => ({ state: 'unsupported' }), install: () => {}, onStatus: () => () => {} },
+  info: async () => null,
+  logError: () => {},
+  feedback: async ({ subject, body }) => { window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; },
   exportBackup: async (state) => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');

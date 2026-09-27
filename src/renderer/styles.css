@@ -543,3 +543,18 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
 .explain b { color: var(--text); }
 .fx-table td, .fx-table th { padding: 6px 10px; }
 @media (max-width: 900px) { .period-head { display: none; } .hero-stats { grid-template-columns: 1fr 1fr; } .review-list { grid-template-columns: 1fr; } }
+
+/* ================= v0.4: sharing ================= */
+.version { font-size: 11px; color: var(--muted); text-align: center; }
+.privacy-note { background: #12a57814; border: 1px solid #12a57855; border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--text-2); }
+.update-banner { position: sticky; top: 0; z-index: 20; display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; background: linear-gradient(90deg, #3a86ee33, #8f7cf033); border-bottom: 1px solid #3a86ee66; padding: 8px 16px; font-size: 13px; backdrop-filter: blur(6px); }
+.crash { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--bg); }
+.crash-card { max-width: 520px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+.crash-icon { font-size: 36px; }
+.crash-detail { background: #0008; border-radius: 10px; padding: 10px; font-size: 12px; white-space: pre-wrap; color: #ffb3b5; margin: 0; }
+.steps-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--text-2); }
+.faq details { border-bottom: 1px solid var(--border); padding: 10px 0; }
+.faq summary { cursor: pointer; font-weight: 600; }
+.faq p { margin: 8px 0 0; color: var(--text-2); font-size: 13.5px; }
+.changes { display: flex; gap: 12px; }
+.changes ul { margin: 0 0 8px; padding-left: 18px; color: var(--text-2); font-size: 13px; }

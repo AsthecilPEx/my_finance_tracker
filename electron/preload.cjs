@@ -38,6 +38,10 @@ contextBridge.exposeInMainWorld('pulse', {
   },
   plan: { openFile: () => invoke('plan:openFile') },
   fx: { refresh: () => invoke('fx:refresh') },
+  updates: { status: () => invoke('update:status'), check: () => invoke('update:check'), install: () => invoke('update:install'), onStatus: subscribe('update:status') },
+  info: () => invoke('app:info'),
+  feedback: (payload) => invoke('app:feedback', payload),
+  logError: (message, stack) => invoke('log:error', message, stack).catch(() => {}),
   bank: {
     info: () => invoke('bank:info'),
     pickKey: () => invoke('bank:pickKey'),

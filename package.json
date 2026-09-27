@@ -1,9 +1,11 @@
 {
   "name": "pulse-finance",
   "productName": "Pulse Finance",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A smart personal finance tracker for Windows: category meters, payday calendar, bills, debts, insights and a desktop widget.",
-  "author": "Pulse Finance",
+  "author": {
+    "name": "Pulse Finance"
+  },
   "license": "MIT",
   "type": "module",
   "main": "electron/main.js",
@@ -30,7 +32,8 @@
       "package.json",
       "!node_modules/@tesseract.js-data/eng/4.0.0/**",
       "!node_modules/tesseract.js-core/*-lstm.{js,wasm,wasm.js}",
-      "!node_modules/tesseract.js-core/*.asm.js"
+      "!node_modules/tesseract.js-core/*.asm.js",
+      "src/config.js"
     ],
     "win": {
       "target": [
@@ -47,12 +50,16 @@
           ]
         }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "PulseFinance-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "artifactName": "PulseFinance-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "Pulse Finance"
     },
     "asarUnpack": [
       "node_modules/tesseract.js/**",
@@ -65,10 +72,22 @@
       "enableNodeCliInspectArguments": false,
       "onlyLoadAppFromAsar": true,
       "enableCookieEncryption": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AsthecilPEx",
+        "repo": "my_finance_tracker",
+        "releaseType": "release"
+      }
+    ],
+    "portable": {
+      "artifactName": "PulseFinance-Portable-${version}.${ext}"
     }
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
+    "electron-updater": "^6.8.9",
     "papaparse": "^5.7.0",
     "tesseract.js": "^7.0.0"
   },
@@ -83,5 +102,9 @@
     "vite": "^8.3.1",
     "vitest": "^5.0.1",
     "wait-on": "^9.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AsthecilPEx/my_finance_tracker.git"
   }
 }

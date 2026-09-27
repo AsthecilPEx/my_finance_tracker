@@ -9,6 +9,8 @@ import IncomeEditor from '../components/IncomeEditor.jsx';
 import { CURRENCIES, formatMoney } from '../../engine/money.js';
 import { currenciesInUse, historicalRate } from '../../engine/fx.js';
 import { addDays } from '../../engine/dates.js';
+import { useUpdateStatus } from '../components/UpdateBanner.jsx';
+import { APP_VERSION } from '../../config.js';
 
 export default function Settings() {
   const { state, dispatch, notify, today, fmt } = useApp();
@@ -106,6 +108,7 @@ export default function Settings() {
           <button className="btn danger" onClick={() => { if (confirm('Delete ALL transactions, bills, debts, receipts and settings? This cannot be undone.')) dispatch({ type: 'data/reset' }); }}>Erase everything</button>
         </div>
       </div>
+      {isDesktop && <About />}
       <p className="muted sm">Pulse Finance · Bank holidays: England & Wales · Tax estimates are a guide; your payslip is the final word.</p>
 
       {editing && (
@@ -198,6 +201,33 @@ function Currencies() {
           {Object.entries(CURRENCIES).filter(([k]) => k !== base && !list.includes(k)).map(([k, v]) => <option key={k} value={k}>{k} · {v.name}</option>)}
         </select>
         <button className="btn ghost sm" disabled={!add} onClick={() => { dispatch({ type: 'settings/update', payload: { watchCurrencies: [...watched, add] } }); setAdd(''); if (isDesktop) refresh(); }}>Add</button>
+      </div>
+    </div>
+  );
+}
+
+function About() {
+  const status = useUpdateStatus();
+  const text = {
+    idle: 'Checks for updates shortly after launch.',
+    checking: 'Checking for updates…',
+    current: "You're on the latest version.",
+    downloading: `Downloading version ${status?.available}… ${status?.percent || 0}%`,
+    ready: `Version ${status?.available} is ready. Restart to finish updating.`,
+    error: status?.error,
+    unsupported: status?.reason === 'portable' ? "The portable version doesn't update itself. Install Pulse with the Setup file to get automatic updates." : 'Updates are off in development builds.',
+  }[status?.state || 'idle'];
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3>✨ About & updates</h3>
+        <span className="muted sm">Version {APP_VERSION}</span>
+      </div>
+      <p className={status?.state === 'error' ? 'note' : 'muted'}>{text}</p>
+      <div className="inline-row">
+        {status?.state === 'ready'
+          ? <button className="btn primary" onClick={() => api.updates.install()}>Restart and update</button>
+          : <button className="btn ghost" disabled={['checking', 'downloading', 'unsupported'].includes(status?.state)} onClick={() => api.updates.check()}>Check for updates</button>}
       </div>
     </div>
   );

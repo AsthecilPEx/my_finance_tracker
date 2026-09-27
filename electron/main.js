@@ -1,6 +1,9 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification, screen, safeStorage, clipboard, session, net } from 'electron';
-import { createSecureFetch } from './net.js';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, Notification, screen, safeStorage, clipboard, session } from 'electron';
+import { createSecureFetch, ALLOWED_HOSTS } from './net.js';
 import { startFxUpdater } from './fx-updater.js';
+import { startUpdater } from './updater.js';
+import { createLogger } from './logger.js';
+import { FEEDBACK_EMAIL, DOWNLOAD_URL } from '../src/config.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,9 +38,13 @@ let quitting = false;
 let watcher;
 let bank;
 let fxUpdater;
-const secureFetch = createSecureFetch((url, opts) => net.fetch(url, opts), { log: (...a) => console.log('[net]', ...a) });
+let updater;
+let logger;
+// Approved outbound traffic uses its own session, separate from the UI's (which is fully blocked).
+const NET_PARTITION = 'pulse-net';
+const secureFetch = createSecureFetch((url, opts) => session.fromPartition(NET_PARTITION).fetch(url, opts), { log: (...a) => console.log('[net]', ...a) });
 
-const log = (...args) => console.log('[pulse]', ...args);
+const log = (...args) => { console.log('[pulse]', ...args); logger?.warn(...args); };
 
 // ---------- secrets (Open Banking keys), encrypted with Windows DPAPI via safeStorage ----------
 function createSecrets(file) {
@@ -316,6 +323,18 @@ function registerIpc() {
   handle('bank:disconnect', async () => { await bank.disconnect(); updateTray(); });
 
   handle('fx:refresh', () => fxUpdater.refresh());
+  handle('update:status', () => updater.status());
+  handle('update:check', () => updater.check());
+  handle('update:install', () => updater.install());
+  handle('log:error', (message, stack) => { logger.error('[ui]', String(message).slice(0, 500), String(stack || '').slice(0, 2000)); });
+  handle('app:info', () => ({ version: app.getVersion(), platform: `${process.platform} ${process.getSystemVersion?.() || ''}`.trim(), electron: process.versions.electron, downloadUrl: DOWNLOAD_URL, feedbackEmail: FEEDBACK_EMAIL }));
+  // Opens the user's email app addressed to the app's feedback inbox only.
+  handle('app:feedback', ({ subject, body, includeLog }) => {
+    const info = `\n\n---\nPulse ${app.getVersion()} · ${process.platform} ${process.getSystemVersion?.() || ''}`;
+    const tail = includeLog ? `\n\nRecent errors:\n${logger.tail(25)}` : '';
+    const text = `${String(body || '')}${info}${tail}`.slice(0, 1800);
+    return shell.openExternal(`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(String(subject || 'Pulse feedback').slice(0, 120))}&body=${encodeURIComponent(text)}`);
+  });
   handle('watcher:status', () => watcher.status());
   handle('watcher:scan', () => watcher.scan());
 }
@@ -333,6 +352,15 @@ function hardenSession() {
     const logo = details.resourceType === 'image' && /^https:\/\/([a-z0-9-]+\.)*enablebanking\.com\//i.test(u);
     cb({ cancel: !(local || logo) });
   });
+  // The gateway's session: HTTPS to allow-listed hosts only (a second lock behind net.js).
+  session.fromPartition(NET_PARTITION).webRequest.onBeforeRequest((details, cb) => {
+    let ok = false;
+    try { const u = new URL(details.url); ok = u.protocol === 'https:' && ALLOWED_HOSTS.has(u.hostname); } catch { /* invalid URL */ }
+    cb({ cancel: !ok });
+  });
+  // The updater's own session may only talk to GitHub's release servers over HTTPS.
+  const UPDATE_HOSTS = /^https:\/\/(github\.com|api\.github\.com|objects\.githubusercontent\.com|release-assets\.githubusercontent\.com)\//i;
+  session.fromPartition('electron-updater').webRequest.onBeforeRequest((details, cb) => cb({ cancel: !UPDATE_HOSTS.test(details.url) }));
 }
 
 app.on('web-contents-created', (_e, contents) => {
@@ -370,6 +398,9 @@ app.on('second-instance', showMain);
 app.whenReady().then(() => {
   hardenSession();
   const dir = app.getPath('userData');
+  logger = createLogger(path.join(dir, 'logs'));
+  process.on('uncaughtException', (err) => logger.error('[main]', err));
+  process.on('unhandledRejection', (err) => logger.error('[main] unhandled', err));
   store = new Store(dir);
   receiptsDir = path.join(dir, 'receipts');
   fs.mkdirSync(receiptsDir, { recursive: true });
@@ -386,6 +417,13 @@ app.whenReady().then(() => {
   });
   bank = new EnableBankingConnector({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), fetchImpl: secureFetch, log });
   fxUpdater = startFxUpdater({ getState: () => store.get(), dispatch, secureFetch, log });
+  updater = startUpdater({
+    app,
+    notify,
+    log,
+    beforeInstall: () => { quitting = true; store.flush(); },
+    broadcast: (status) => { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('update:status', status); },
+  });
   bank.snapshot = () => new Set(store.get().transactions.map((t) => t.id));
   bank.onNewTransactions = (added, from, before) => {
     notify('Bank synced', `${added} new transaction${added === 1 ? '' : 's'} from ${from}`, 'transactions');
@@ -411,6 +449,7 @@ app.on('before-quit', () => {
   watcher?.stop();
   bank?.stop();
   fxUpdater?.stop();
+  updater?.stop();
 });
 
 app.on('window-all-closed', () => {

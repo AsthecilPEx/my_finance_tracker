@@ -79,7 +79,7 @@ export default function Onboarding() {
             <div className="row2">
               <Field label="Where do you pay tax?">
                 <select value={me.region} onChange={(e) => setMe({ ...me, region: e.target.value })}>
-                  <option value="ruk">England, Wales or Northern Ireland</option>
+                  <option value="ruk">England, Wales or NI</option>
                   <option value="scotland">Scotland</option>
                 </select>
               </Field>
@@ -90,6 +90,7 @@ export default function Onboarding() {
                 </select>
               </Field>
             </div>
+            <p className="privacy-note">🔒 <b>Private by design.</b> No account, no cloud. Your finances are stored only on this computer. Pulse goes online only for exchange rates, updates and (if you choose) a read-only bank connection.</p>
             <div className="onboard-actions">
               <button className="btn ghost" onClick={demo}>Just explore with demo data</button>
               <button className="btn primary" onClick={() => setStep(1)}>Let's go →</button>

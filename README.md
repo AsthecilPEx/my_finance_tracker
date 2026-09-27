@@ -1,6 +1,16 @@
 # Pulse Finance
 
-A friendly personal finance app for Windows, built around **your** paydays. You might be paid monthly, weekly every Friday, every other week, on the last working day, or whenever the work comes in. Pulse turns that into a calendar, a steady spending allowance, and bills that never catch you out.
+**A friendly money app for Windows that plans around your paydays.** It works whether you're paid monthly, weekly, every other Friday or whenever the work comes in. See where every pound goes, never get caught out by a bill, and spot the small spends that add up.
+
+### ⬇️ [Download for Windows](https://github.com/AsthecilPEx/my_finance_tracker/releases/latest)
+
+1. On the download page, under **Assets**, click **PulseFinance-Setup-….exe**.
+2. Open it. If Windows says *"Windows protected your PC"*, click **More info → Run anyway**. Windows shows this for any new app that hasn't paid for a Microsoft certificate.
+3. Pick **Explore with demo data** to look around, or **Let's go** to set up your own pay and bills in about 2 minutes.
+
+🔒 **Private by design:** no account, no cloud. Your finances are stored only on your own computer.
+✨ **Updates itself:** new versions download in the background; you'll see "Restart to update".
+💬 **Feedback:** in the app, open **Help & feedback**.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -45,9 +55,19 @@ A friendly personal finance app for Windows, built around **your** paydays. You 
 
 These fallbacks stay because Open Banking depends on a third party and on each bank's consent rules. They live under *Bank Sync → Other ways*, out of the everyday flow. The same payment arriving by two routes is de-duplicated.
 
-## Install and run
+## Releasing a new version (for the maintainer)
 
-Every push to `main` and every pull request runs the *Build Windows app* workflow, which uploads the installer and a portable `.exe` as build artifacts. To build it yourself on Windows (Node.js 20+):
+1. Bump `"version"` in `package.json` (e.g. `0.4.0` → `0.4.1`) and merge to `main`.
+2. On GitHub, go to **Actions → Release for friends → Run workflow**.
+3. About 5 minutes later there's a public Release with the installer and friend-friendly notes. Everyone who has installed Pulse gets the update automatically.
+
+Pull requests also run the *Build Windows app* workflow, which uploads test installers as build artifacts.
+
+**Code signing (optional, removes the SmartScreen warning):** buy a code-signing certificate, or use Microsoft's *Azure Trusted Signing*, and add it to the release workflow. Nothing else changes.
+
+## Building it yourself
+
+On Windows (Node.js 20+):
 
 ```bash
 npm install
@@ -92,6 +112,10 @@ electron/connectors/   read-only data connectors (Enable Banking today)
 ```
 
 Tax rates live in `TAX_YEAR` in `payroll.js`. rUK income tax thresholds and NI are frozen, so 2026/27 matches 2025/26. Scottish bands and student-loan thresholds are the 2025/26 figures and should be checked each April.
+
+## Disclaimer
+
+Pulse is a personal budgeting tool, not financial, tax or investment advice. Take-home pay, tax and payoff figures are estimates. Check anything important against your payslip, lender or a qualified adviser. Provided as-is under the [MIT licence](LICENSE).
 
 ## Room to grow (V3)
 

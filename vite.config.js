@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
+
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // Strict Content-Security-Policy for the packaged app (dev server needs inline HMR scripts).
 const csp = {
@@ -13,6 +16,7 @@ const csp = {
 
 export default defineConfig({
   plugins: [react(), csp],
+  define: { __APP_VERSION__: JSON.stringify(version) },
   base: './',
   build: { outDir: 'dist', emptyOutDir: true },
   server: { port: 5173, strictPort: true },

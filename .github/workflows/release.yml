@@ -1,0 +1,61 @@
+name: Release for friends
+
+# Publishes a public GitHub Release that friends download and that installed copies
+# auto-update from. Run it from the Actions tab ("Run workflow") after bumping
+# "version" in package.json, or push a tag like v0.4.1.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check this version hasn't been released yet
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::v$VERSION is already released. Bump \"version\" in package.json first."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build and publish installer
+        run: npm run build && npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Add install notes for friends
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<NOTES
+          ## Install Pulse Finance $VERSION
+          1. Download **PulseFinance-Setup-$VERSION.exe** below (under *Assets*).
+          2. Open it. If Windows says *"Windows protected your PC"*, click **More info → Run anyway** (the app isn't signed with a paid certificate yet).
+          3. Choose **Explore with demo data** to look around, or **Let's go** to set up your own pay and bills.
+
+          Already have Pulse? It updates itself. You'll see *"Restart to update"*.
+
+          🔒 Your data stays on your own computer. There's no account and nothing is uploaded.
+
+          *Prefer not to install? Use PulseFinance-Portable-$VERSION.exe (no automatic updates).*
+          NOTES
+          gh release edit "v$VERSION" --notes-file notes.md --title "Pulse Finance $VERSION"
