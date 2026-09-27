@@ -558,3 +558,5 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
 .faq p { margin: 8px 0 0; color: var(--text-2); font-size: 13.5px; }
 .changes { display: flex; gap: 12px; }
 .changes ul { margin: 0 0 8px; padding-left: 18px; color: var(--text-2); font-size: 13px; }
+
+.dialog-message { margin: 0; color: var(--text-2); line-height: 1.5; }

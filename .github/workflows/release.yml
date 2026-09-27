@@ -35,6 +35,8 @@ jobs:
 
       - run: npm ci
       - run: npm test
+      - name: Type into every input on every screen (real Windows)
+        run: npm run build && npm run test:e2e
 
       - name: Build and publish installer
         run: npm run build && npx electron-builder --win --publish always

@@ -11,9 +11,11 @@ import { currenciesInUse, historicalRate } from '../../engine/fx.js';
 import { addDays } from '../../engine/dates.js';
 import { useUpdateStatus } from '../components/UpdateBanner.jsx';
 import { APP_VERSION } from '../../config.js';
+import { useDialog } from '../components/Dialogs.jsx';
 
 export default function Settings() {
   const { state, dispatch, notify, today, fmt } = useApp();
+  const dialog = useDialog();
   const st = state.settings;
   const profile = state.profile;
   const set = (patch) => dispatch({ type: 'settings/update', payload: patch });
@@ -49,7 +51,7 @@ export default function Settings() {
             </select>
           </Field>
           <Field label="Home currency" hint="Everything is totalled in this">
-            <select value={st.currency} onChange={(e) => { if (confirm('Change your home currency? Amounts already recorded keep their values; bills and debts in other currencies are re-converted.')) set({ currency: e.target.value }); }}>
+            <select value={st.currency} onChange={async (e) => { const currency = e.target.value; if (await dialog.confirm({ title: 'Change home currency?', message: 'Amounts already recorded keep their values. Bills and debts in other currencies are re-converted to the new home currency.', okLabel: 'Change currency' })) set({ currency }); }}>
               {Object.entries(CURRENCIES).map(([k, v]) => <option key={k} value={k}>{v.symbol} {v.name} ({k})</option>)}
             </select>
           </Field>
@@ -104,8 +106,8 @@ export default function Settings() {
           <button className="btn ghost" onClick={() => set({ onboarded: false })}>Run the setup wizard again</button>
         </div>
         <div className="inline-row wrap danger-zone">
-          <button className="btn ghost" onClick={() => { if (confirm('Replace all data with demo data?')) dispatch({ type: 'data/replace', payload: createDemoState(today) }); }}>Load demo data</button>
-          <button className="btn danger" onClick={() => { if (confirm('Delete ALL transactions, bills, debts, receipts and settings? This cannot be undone.')) dispatch({ type: 'data/reset' }); }}>Erase everything</button>
+          <button className="btn ghost" onClick={async () => { if (await dialog.confirm({ title: 'Load demo data?', message: 'This replaces everything in Pulse with example data. Export a backup first if you want to keep your own.', okLabel: 'Replace with demo data', danger: true })) dispatch({ type: 'data/replace', payload: createDemoState(today) }); }}>Load demo data</button>
+          <button className="btn danger" onClick={async () => { if (await dialog.confirm({ title: 'Erase everything?', message: 'This deletes ALL transactions, bills, debts, receipts, goals and settings. It cannot be undone (daily backups are still in your Pulse folder).', okLabel: 'Erase everything', danger: true })) dispatch({ type: 'data/reset' }); }}>Erase everything</button>
         </div>
       </div>
       {isDesktop && <About />}
@@ -137,6 +139,7 @@ function Toggle({ label, checked, onChange }) {
 
 function Currencies() {
   const { state, dispatch, notify, today } = useApp();
+  const dialog = useDialog();
   const [busy, setBusy] = useState(false);
   const [add, setAdd] = useState('');
   const base = state.settings.currency;
@@ -156,8 +159,8 @@ function Currencies() {
       setBusy(false);
     }
   };
-  const setManual = (cur) => {
-    const v = prompt(`How many ${cur} for 1 ${base}?`, fx?.rates?.[cur] || '');
+  const setManual = async (cur) => {
+    const v = await dialog.prompt({ title: `Set ${cur} rate`, message: `How many ${cur} for 1 ${base}?`, defaultValue: String(fx?.rates?.[cur] || ''), inputType: 'number', okLabel: 'Save rate' });
     if (!v || !(+v > 0)) return;
     dispatch({ type: 'fx/set', payload: { ...(fx || { base, history: {} }), base, rates: { ...(fx?.rates || {}), [cur]: +v }, source: 'manual', date: today } });
   };

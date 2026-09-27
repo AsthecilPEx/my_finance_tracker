@@ -130,6 +130,9 @@ function load(win, hash = '') {
 }
 
 function harden(win) {
+  // Windows/Electron quirk: after a dialog or switching apps, the page can lose keyboard focus
+  // even though the window is active, so text boxes ignore typing. Always hand focus back.
+  win.on('focus', () => { if (!win.isDestroyed()) win.webContents.focus(); });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
@@ -228,40 +231,48 @@ function createTray() {
 }
 
 // ---------- IPC ----------
+// Native file pickers can leave the page without keyboard focus on Windows (text boxes then
+// ignore typing), so focus is handed back to the page after every one.
+async function withDialog(fn) {
+  try { return await fn(); } finally {
+    if (mainWin && !mainWin.isDestroyed()) { mainWin.focus(); mainWin.webContents.focus(); }
+  }
+}
+
 function registerIpc() {
   const handle = (ch, fn) => ipcMain.handle(ch, (_e, ...args) => fn(...args));
   handle('state:get', () => store.get());
   handle('state:dispatch', (action) => dispatch(action));
 
   handle('dialog:openCsv', async () => {
-    const r = await dialog.showOpenDialog(mainWin, { title: 'Import bank statement', filters: [{ name: 'CSV statement', extensions: ['csv'] }], properties: ['openFile'] });
+    const r = await withDialog(() => dialog.showOpenDialog(mainWin, { title: 'Import bank statement', filters: [{ name: 'CSV statement', extensions: ['csv'] }], properties: ['openFile'] }));
     if (r.canceled || !r.filePaths[0]) return null;
     return { name: path.basename(r.filePaths[0]), text: fs.readFileSync(r.filePaths[0], 'utf8') };
   });
   handle('dialog:chooseFolder', async () => {
-    const r = await dialog.showOpenDialog(mainWin, { title: 'Choose a folder to watch for statements', properties: ['openDirectory'] });
+    const r = await withDialog(() => dialog.showOpenDialog(mainWin, { title: 'Choose a folder to watch for statements', properties: ['openDirectory'] }));
     return r.canceled ? null : r.filePaths[0];
   });
   handle('backup:export', async () => {
-    const r = await dialog.showSaveDialog(mainWin, { defaultPath: `pulse-finance-backup-${new Date().toISOString().slice(0, 10)}.json`, filters: [{ name: 'Backup', extensions: ['json'] }] });
+    const r = await withDialog(() => dialog.showSaveDialog(mainWin, { defaultPath: `pulse-finance-backup-${new Date().toISOString().slice(0, 10)}.json`, filters: [{ name: 'Backup', extensions: ['json'] }] }));
     if (r.canceled || !r.filePath) return false;
     fs.writeFileSync(r.filePath, JSON.stringify(store.get(), null, 2));
     return true;
   });
   handle('backup:import', async () => {
-    const r = await dialog.showOpenDialog(mainWin, { filters: [{ name: 'Backup', extensions: ['json'] }], properties: ['openFile'] });
+    const r = await withDialog(() => dialog.showOpenDialog(mainWin, { filters: [{ name: 'Backup', extensions: ['json'] }], properties: ['openFile'] }));
     if (r.canceled || !r.filePaths[0]) return null;
     return migrate(JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8')));
   });
 
   handle('clipboard:write', (text) => clipboard.writeText(String(text)));
   handle('file:saveText', async (text, name) => {
-    const r = await dialog.showSaveDialog(mainWin, { defaultPath: name, filters: [{ name: 'Text', extensions: ['txt'] }] });
+    const r = await withDialog(() => dialog.showSaveDialog(mainWin, { defaultPath: name, filters: [{ name: 'Text', extensions: ['txt'] }] }));
     if (!r.canceled && r.filePath) fs.writeFileSync(r.filePath, String(text));
     return !r.canceled;
   });
   handle('plan:openFile', async () => {
-    const r = await dialog.showOpenDialog(mainWin, { title: 'Open AI reply', filters: [{ name: 'Text or JSON', extensions: ['txt', 'json', 'md'] }], properties: ['openFile'] });
+    const r = await withDialog(() => dialog.showOpenDialog(mainWin, { title: 'Open AI reply', filters: [{ name: 'Text or JSON', extensions: ['txt', 'json', 'md'] }], properties: ['openFile'] }));
     if (r.canceled || !r.filePaths[0]) return null;
     const stat = fs.statSync(r.filePaths[0]);
     if (stat.size > 2 * 1024 * 1024) throw new Error('That file is too large to be an AI reply.');
@@ -275,7 +286,7 @@ function registerIpc() {
   };
   const dataUrl = (file) => `data:${IMAGE_TYPES[path.extname(file).slice(1).toLowerCase()]};base64,${fs.readFileSync(file).toString('base64')}`;
   handle('receipt:pickImage', async () => {
-    const r = await dialog.showOpenDialog(mainWin, { title: 'Receipt photo', filters: [{ name: 'Images', extensions: Object.keys(IMAGE_TYPES) }], properties: ['openFile'] });
+    const r = await withDialog(() => dialog.showOpenDialog(mainWin, { title: 'Receipt photo', filters: [{ name: 'Images', extensions: Object.keys(IMAGE_TYPES) }], properties: ['openFile'] }));
     if (r.canceled || !r.filePaths[0]) return null;
     const src = r.filePaths[0];
     const ext = path.extname(src).slice(1).toLowerCase();
@@ -299,7 +310,7 @@ function registerIpc() {
 
   handle('bank:info', () => bank.info());
   handle('bank:pickKey', async () => {
-    const r = await dialog.showOpenDialog(mainWin, { title: 'Enable Banking private key', filters: [{ name: 'Private key', extensions: ['pem', 'key'] }], properties: ['openFile'] });
+    const r = await withDialog(() => dialog.showOpenDialog(mainWin, { title: 'Enable Banking private key', filters: [{ name: 'Private key', extensions: ['pem', 'key'] }], properties: ['openFile'] }));
     if (r.canceled || !r.filePaths[0]) return null;
     return { name: path.basename(r.filePaths[0]), text: fs.readFileSync(r.filePaths[0], 'utf8') };
   });

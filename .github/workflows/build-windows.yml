@@ -33,6 +33,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run dist -- --publish never
+      - name: Type into every input on every screen (real Windows)
+        run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         with:
           name: PulseFinance-Windows

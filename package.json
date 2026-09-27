@@ -16,7 +16,8 @@
     "start": "vite build && electron .",
     "test": "vitest run",
     "dist": "vite build && electron-builder --win",
-    "dist:dir": "vite build && electron-builder --dir"
+    "dist:dir": "vite build && electron-builder --dir",
+    "test:e2e": "node tests/e2e/inputs.e2e.mjs"
   },
   "build": {
     "appId": "app.pulsefinance.desktop",
@@ -97,6 +98,7 @@
     "cross-env": "^10.1.0",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
+    "playwright-core": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "vite": "^8.3.1",

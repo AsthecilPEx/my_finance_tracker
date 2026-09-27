@@ -3,6 +3,7 @@ import { AppProvider } from './store.jsx';
 import App from './App.jsx';
 import Widget from './Widget.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { DialogProvider } from './components/Dialogs.jsx';
 import { api } from './api.js';
 import './styles.css';
 
@@ -12,5 +13,5 @@ window.addEventListener('unhandledrejection', (e) => api.logError?.(String(e.rea
 document.body.classList.toggle('widget-body', isWidget);
 
 createRoot(document.getElementById('root')).render(
-  <ErrorBoundary><AppProvider>{isWidget ? <Widget /> : <App />}</AppProvider></ErrorBoundary>,
+  <ErrorBoundary><AppProvider><DialogProvider>{isWidget ? <Widget /> : <App />}</DialogProvider></AppProvider></ErrorBoundary>,
 );
