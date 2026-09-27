@@ -8,6 +8,8 @@ import { payPlan, bonusPaydayMonths, incomeVariability } from '../../engine/plan
 import { profileSummary, describeSchedule } from '../../engine/income.js';
 import { shortDate, weekdayShort, daysBetween, parseISO } from '../../engine/dates.js';
 import { splitTotals } from '../../engine/split.js';
+import PayEditor from '../components/PayEditor.jsx';
+import { buildOccurrences } from '../../engine/summary.js';
 
 export default function Planner({ go }) {
   const { state, today, fmt, currency } = useApp();
@@ -17,6 +19,8 @@ export default function Planner({ go }) {
   const prof = profileSummary(state);
   const potOn = state.settings.billPot?.enabled !== false;
   const [goalEdit, setGoalEdit] = useState(null);
+  const [editOcc, setEditOcc] = useState(null);
+  const payOccs = (date) => buildOccurrences(state, date, date).filter((o) => o.amount > 0);
 
   if (!prof.sources.length && !plan.periods.length) {
     return (
@@ -113,7 +117,16 @@ export default function Planner({ go }) {
                 <b>{p.current ? 'Now' : `${weekdayShort(p.from)} ${shortDate(p.from)}`}</b>
                 <span className="muted sm">{p.current ? `until ${shortDate(p.to)}` : `${p.days} days · to ${shortDate(p.to)}`}</span>
               </div>
-              <div className="period-in">{p.income > 0 ? <><b className="pos">+{fmt(p.income, { decimals: 0 })}</b><span className="muted sm">{p.names.join(' + ')}</span></> : <span className="muted sm">from what you have now</span>}</div>
+              <div className="period-in">{p.income > 0 ? (
+                <>
+                  <b className="pos">+{fmt(p.income, { decimals: 0 })}</b>
+                  <span className="muted sm">
+                    {payOccs(p.from).map((o) => (
+                      <button key={o.key} className="linkish pay-edit" title="Edit this payday" onClick={() => setEditOcc(o)}>{o.name}{o.override ? ' ✎' : ''} <span aria-hidden>✎</span></button>
+                    ))}
+                  </span>
+                </>
+              ) : <span className="muted sm">from what you have now</span>}</div>
               <div className="period-bills">
                 {p.bills.length === 0 ? <span className="muted sm">No bills due</span> : p.bills.slice(0, 5).map((b) => (
                   <span key={b.key} className="chip" style={{ '--c': EVENT_TYPES[b.type].color }} title={`${b.name} · ${shortDate(b.date)}`}>{b.name.split(' ')[0]} {compactMoney(b.amount, currency)}</span>
@@ -139,6 +152,7 @@ export default function Planner({ go }) {
         )}
       </div>
       {goalEdit && <GoalModal goal={goalEdit} onClose={() => setGoalEdit(null)} />}
+      {editOcc && <PayEditor occ={editOcc} onClose={() => setEditOcc(null)} />}
     </div>
   );
 }

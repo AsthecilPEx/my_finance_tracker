@@ -10,6 +10,9 @@ import { receiptInbox } from '../../engine/receipts.js';
 import { payPlan } from '../../engine/planner.js';
 import ReviewPanel from '../components/ReviewPanel.jsx';
 import { splitTotals } from '../../engine/split.js';
+import PayEditor from '../components/PayEditor.jsx';
+import { parseOccKey } from '../../engine/income.js';
+import { scheduleItems } from '../../engine/summary.js';
 
 function greeting() {
   const h = new Date().getHours();
@@ -17,7 +20,7 @@ function greeting() {
 }
 
 export default function Dashboard({ go }) {
-  const { state, today, fmt } = useApp();
+  const { state, today, fmt, dispatch } = useApp();
   const t = parseISO(today);
   const [view, setView] = useState({ y: t.getFullYear(), m: t.getMonth() });
   const [selected, setSelected] = useState(today);
@@ -30,6 +33,14 @@ export default function Dashboard({ go }) {
   const status = !s.income ? { c: 'var(--accent)', t: 'Add your pay under Bills & Income', i: 'i' } : s.leftToSpend < 0 ? { c: 'var(--critical)', t: 'Overspent', i: '⚠' } : leftRatio < 0.1 ? { c: 'var(--warning)', t: 'Running low', i: '◐' } : { c: 'var(--good)', t: 'On track', i: '✓' };
   const selDay = s.days[selected];
   const owed = useMemo(() => splitTotals(state, today), [state, today]);
+  const [editOcc, setEditOcc] = useState(null);
+  // Paydays/bills that were skipped or moved away from the selected day, so they can be reset.
+  const movedAway = useMemo(() => {
+    const names = Object.fromEntries([...scheduleItems(state), ...(state.debts || [])].map((x) => [x.id, x.name]));
+    return Object.entries(state.overrides || {}).map(([key, o]) => ({ key, o, ...parseOccKey(key) }))
+      .filter((x) => x.date === selected && (x.o.skipped || (x.o.date && x.o.date !== x.date)))
+      .map((x) => ({ ...x, name: names[x.sourceId] || 'Payment' }));
+  }, [state, selected]);
   const caps = useMemo(() => evaluateCaps(state, today).filter((c) => c.status !== 'ok'), [state, today]);
   const inbox = useMemo(() => (state.settings.receiptPrompts === false ? [] : receiptInbox(state, today)), [state, today]);
   const plan = useMemo(() => payPlan(state, today, 2), [state, today]);
@@ -160,7 +171,15 @@ export default function Dashboard({ go }) {
                       <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
                       <span className="grow">{e.name}<small className="muted"> · {EVENT_TYPES[e.type].label}{e.compulsory ? ' · compulsory' : ''}</small></span>
                       <span className={`badge ${e.status}`}>{e.status === 'done' ? '✓ Paid' : e.status === 'assumed' ? 'Not seen' : 'Due'}</span>
-                      <b className={e.amount > 0 ? 'pos' : ''}>{fmt(e.amount, { sign: true })}</b>
+                      <b className={e.amount > 0 ? 'pos' : ''}>{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag" title={e.override.note || 'Edited'}> ✎ edited</small>}</b>
+                      <button className="btn ghost sm" onClick={() => setEditOcc(e)} title={e.amount > 0 ? 'Change the amount or date of this payday' : 'Change this one payment'}>✎ Edit</button>
+                    </li>
+                  ))}
+                  {movedAway.map((m) => (
+                    <li key={m.key} className="list-row muted">
+                      <span className="dot" style={{ background: 'var(--muted)' }} />
+                      <span className="grow">{m.name}<small> · {m.o.skipped ? 'not happening this time' : `moved to ${shortDate(m.o.date)}`}{m.o.note ? ` · ${m.o.note}` : ''}</small></span>
+                      <button className="btn ghost sm" onClick={() => dispatch({ type: 'occ/reset', payload: { key: m.key } })}>Reset</button>
                     </li>
                   ))}
                   {selDay.txns.map((tx) => (
@@ -185,7 +204,8 @@ export default function Dashboard({ go }) {
                     <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
                     <span className="grow">{e.name}<small className="muted"> · {weekdayShort(e.date)} {shortDate(e.date)}</small></span>
                     {e.compulsory && <span className="badge must">Must pay</span>}
-                    <b className={e.amount > 0 ? 'pos' : ''}>{fmt(e.amount, { sign: true })}</b>
+                    <b className={e.amount > 0 ? 'pos' : ''}>{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag"> ✎</small>}</b>
+                    <button className="icon-btn" aria-label={`Edit ${e.name} on ${e.date}`} title="Edit this one" onClick={() => setEditOcc(e)}>✎</button>
                   </li>
                 ))}
               </ul>
@@ -193,6 +213,7 @@ export default function Dashboard({ go }) {
           </div>
         </section>
       </div>
+      {editOcc && <PayEditor occ={editOcc} onClose={() => setEditOcc(null)} />}
     </div>
   );
 }

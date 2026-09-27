@@ -13,17 +13,38 @@ export function scheduleItems(state) {
 
 const KIND_TO_TYPE = { salary: 'payday', income: 'income', bill: 'bill', subscription: 'subscription', savings: 'savings', investment: 'savings', other: 'bill' };
 
-/** Expected money events (paydays, bills, subscriptions, debt payments) between two dates. */
+/**
+ * Expected money events (paydays, bills, subscriptions, debt payments) between two dates.
+ * One-off edits (state.overrides, keyed by the occurrence key "<sourceId>:<scheduled date>")
+ * can change a single payday's or bill's amount, move its date, or skip it entirely.
+ */
 export function buildOccurrences(state, from, to) {
   state = financialView(state);
   const holidays = state.settings?.extraHolidays;
+  const overrides = state.overrides || {};
+  // Look a little either side so a payday moved into (or out of) the range is handled.
+  const lo = addDays(from, -31);
+  const hi = addDays(to, 31);
   const out = [];
+  const emit = (occ) => {
+    const o = overrides[occ.key];
+    if (o) {
+      if (o.skipped) return;
+      occ.scheduledDate = occ.date;
+      occ.scheduledAmount = occ.amount;
+      if (o.date) occ.date = o.date;
+      if (typeof o.amount === 'number' && isFinite(o.amount)) occ.amount = occ.amount < 0 ? -Math.abs(o.amount) : Math.abs(o.amount);
+      occ.override = o;
+    }
+    if (occ.date >= from && occ.date <= to) out.push(occ);
+  };
   for (const r of scheduleItems(state)) {
     if (r.active === false) continue;
-    for (const date of occurrencesBetween(r, from, to, holidays)) {
-      out.push({
+    for (const date of occurrencesBetween(r, lo, hi, holidays)) {
+      emit({
         key: `${r.id}:${date}`,
         sourceId: r.id,
+        incomeId: r.incomeId,
         source: 'recurring',
         type: r.direction === 'in' ? (r.kind === 'salary' ? 'payday' : 'income') : KIND_TO_TYPE[r.kind] || 'bill',
         date,
@@ -38,8 +59,8 @@ export function buildOccurrences(state, from, to) {
   for (const d of state.debts || []) {
     if (!(d.balance > 0) || !(d.minPayment > 0) || !d.dueDay) continue;
     const item = { frequency: 'monthly', dayOfMonth: d.dueDay, startDate: d.startDate || '2000-01-01', adjust: 'none' };
-    for (const date of occurrencesBetween(item, from, to, holidays)) {
-      out.push({
+    for (const date of occurrencesBetween(item, lo, hi, holidays)) {
+      emit({
         key: `${d.id}:${date}`,
         sourceId: d.id,
         source: 'debt',
@@ -139,10 +160,9 @@ export function monthSummary(state, year, month, today) {
   }
   for (const o of occurrences) days[o.date]?.events.push(o);
 
-  const salaryItems = scheduleItems(state).filter((r) => r.active !== false && r.kind === 'salary');
-  const paydays = salaryItems.map((r) => ({ r, date: nextOccurrence(r, today, state.settings?.extraHolidays) })).filter((p) => p.date);
-  paydays.sort((a, b) => a.date.localeCompare(b.date));
-  const nextPayday = paydays[0] ? { date: paydays[0].date, name: paydays[0].r.name, amount: paydays[0].r.amount, inDays: daysBetween(today, paydays[0].date) } : null;
+  // Next payday comes from the real (possibly edited or skipped) occurrences.
+  const nextPay = buildOccurrences(state, today, addDays(today, 400)).find((o) => o.type === 'payday');
+  const nextPayday = nextPay ? { date: nextPay.date, name: nextPay.name, amount: nextPay.amount, inDays: daysBetween(today, nextPay.date), key: nextPay.key, edited: !!nextPay.override } : null;
 
   const isCurrent = today >= from && today <= to;
   let safePerDay = null;

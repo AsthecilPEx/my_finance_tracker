@@ -124,3 +124,15 @@ function suffix(n) {
 }
 
 export { addDays };
+
+/** Take-home for one pay period in which `hours` were worked (hourly jobs), including tax and NI. */
+export function netForHours(inc, region, hours) {
+  const periods = paysPerYear(inc);
+  const weeksPerPay = 52 / periods;
+  return takeHome({ ...inc, payType: 'hourly', hoursPerWeek: (+hours || 0) / weeksPerPay }, region).netPerPay;
+}
+
+/** Split an occurrence key "<sourceId>:<YYYY-MM-DD>" into its parts. */
+export function parseOccKey(key) {
+  return { sourceId: key.slice(0, -11), date: key.slice(-10) };
+}

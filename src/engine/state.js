@@ -44,6 +44,7 @@ export function createEmptyState() {
     // written by later versions survives a round trip through this one.
     portfolio: { holdings: [], connectors: [] },
     fx: null,
+    overrides: {},
     potLog: [],
     reviewDismissed: [],
   };
@@ -223,6 +224,19 @@ export function reduce(state, action) {
     }
     case 'review/dismiss':
       return { ...state, reviewDismissed: [...new Set([...(state.reviewDismissed || []), p.key])].slice(-1000) };
+
+    // ---- one-off edits to a single payday or bill (amount, date, skip)
+    case 'occ/override': {
+      const { key, ...o } = p;
+      if (!key) return state;
+      const clean = { ...o, amount: o.amount === '' || o.amount === undefined || o.amount === null ? undefined : round2(Math.abs(+o.amount)), editedAt: new Date().toISOString() };
+      return { ...state, overrides: { ...(state.overrides || {}), [key]: clean } };
+    }
+    case 'occ/reset': {
+      const overrides = { ...(state.overrides || {}) };
+      delete overrides[p.key];
+      return { ...state, overrides };
+    }
 
     // ---- currencies and pots
     case 'fx/set':

@@ -560,3 +560,12 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
 .changes ul { margin: 0 0 8px; padding-left: 18px; color: var(--text-2); font-size: 13px; }
 
 .dialog-message { margin: 0; color: var(--text-2); line-height: 1.5; }
+
+/* one-off payday / bill edits */
+.chip.edited { box-shadow: inset 2px 0 0 var(--c), 0 0 0 1px color-mix(in srgb, var(--c) 70%, white); }
+.edited-tag { color: var(--warning); font-weight: 600; }
+.helpers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: var(--surface-2); border-radius: 12px; padding: 10px; }
+.diff { font-weight: 700; }
+.pay-edit { display: block; font-size: 12px; color: var(--text-2); }
+.pay-edit span { opacity: .5; }
+.pay-edit:hover span { opacity: 1; }

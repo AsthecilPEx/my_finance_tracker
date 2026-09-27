@@ -4,7 +4,7 @@ import { api, isDesktop } from '../api.js';
 import { APP_VERSION, DOWNLOAD_URL } from '../../config.js';
 
 const CHANGES = [
-  { v: '0.4', items: ['Automatic updates', 'Help & feedback', 'Friendlier error screen'] },
+  { v: '0.4', items: ['Edit any single payday or bill from the calendar (amount, hours worked, date, skip)', 'Automatic updates', 'Help & feedback', 'Friendlier error screen', 'Fix: text boxes not accepting typing on Windows'] },
   { v: '0.3', items: ['Split bills with repayment linking', 'Any currency with live exchange rates', '"Needs your attention" dashboard panel', 'Pots, clearer Pay Planner, right-click menus', 'Security hardening'] },
   { v: '0.2', items: ['Pay profiles with UK take-home pay', 'Pay Planner for irregular pay', 'Receipts with offline photo reading', 'Spend caps and AI plans'] },
   { v: '0.1', items: ['Dashboard, calendar, bills, debts, insights and desktop widget'] },

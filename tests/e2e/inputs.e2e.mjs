@@ -112,6 +112,31 @@ await nav('Budgets & Caps'); await win.getByRole('button', { name: '+ New cap' }
 await win.getByLabel('Edit cap').first().click(); await checkInputs('Edit cap', '.modal'); await closeModal();
 await nav('Pay Planner'); await win.getByRole('button', { name: '+ New goal' }).click(); await checkInputs('New goal', '.modal'); await closeModal();
 await win.getByLabel('Edit goal').first().click(); await checkInputs('Edit goal', '.modal'); await closeModal();
+// Edit a single payday from the calendar and check the change flows through.
+await nav('Dashboard');
+await win.getByLabel('Next month').click();
+await win.locator('.cal-day.payday', { hasText: 'PAY' }).last().click();
+const leftBefore = await win.locator('.hero-num').innerText();
+await win.getByRole('button', { name: '✎ Edit' }).first().click();
+await checkInputs('Edit payday popup', '.modal');
+await closeModal(); // discard the test typing (it also changed the date), then edit for real
+await win.getByRole('button', { name: '✎ Edit' }).first().click();
+await win.locator('.modal input[type=number]').first().fill('1234.5');
+await win.locator('.modal input').filter({ hasNot: win.locator('[type]') }).last().fill('Test: 2 days unpaid').catch(() => {});
+await win.getByRole('button', { name: 'Save' }).click();
+await win.waitForTimeout(300);
+const edited = await win.locator('.list-row', { hasText: '✎ edited' }).count();
+const chipEdited = await win.locator('.chip.edited').count();
+const leftAfter = await win.locator('.hero-num').innerText();
+if (!edited || !chipEdited || leftAfter === leftBefore) results.fail.push(`Payday edit did not flow through (panel ${edited}, chip ${chipEdited}, left ${leftBefore} -> ${leftAfter})`);
+else results.ok++;
+await win.getByRole('button', { name: '✎ Edit' }).first().click();
+await win.getByRole('button', { name: 'Reset to normal' }).click();
+await win.waitForTimeout(300);
+if ((await win.locator('.hero-num').innerText()) !== leftBefore) results.fail.push('Reset to normal did not restore the original amount');
+await nav('Pay Planner');
+await win.locator('.pay-edit').first().click();
+await checkInputs('Planner › Edit payday', '.modal'); await closeModal();
 await nav('Dashboard'); await checkInputs('Dashboard after all');
 
 console.log(`inputs typed OK: ${results.ok}`);

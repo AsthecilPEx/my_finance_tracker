@@ -23,7 +23,8 @@ export default function MonthCalendar({ summary, selected, onSelect }) {
         const shown = day.events.slice(0, payday ? 1 : 2);
         const more = day.events.length - shown.length;
         const tip = [
-          ...day.events.map((e) => `${EVENT_TYPES[e.type].label}: ${e.name} ${fmt(e.amount)}${e.status === 'done' ? ' ✓' : e.status === 'assumed' ? ' (not seen on statement)' : ''}`),
+          ...day.events.map((e) => `${EVENT_TYPES[e.type].label}: ${e.name} ${fmt(e.amount)}${e.override ? ` (edited${e.override.note ? `: ${e.override.note}` : ''})` : ''}${e.status === 'done' ? ' ✓' : e.status === 'assumed' ? ' (not seen on statement)' : ''}`),
+          'Click to see details or edit',
           day.flex ? `Day-to-day spending ${fmt(day.flex)}` : null,
         ].filter(Boolean).join('\n');
         return (
@@ -41,8 +42,8 @@ export default function MonthCalendar({ summary, selected, onSelect }) {
               {shown.map((e) => {
                 const t = EVENT_TYPES[e.type];
                 return (
-                  <span key={e.key} className={`chip ${e.status}`} style={{ '--c': t.color }}>
-                    <i aria-hidden>{e.status === 'done' ? '✓' : t.icon}</i>{compactMoney(e.amount, currency)}
+                  <span key={e.key} className={`chip ${e.status} ${e.override ? 'edited' : ''}`} style={{ '--c': t.color }}>
+                    <i aria-hidden>{e.status === 'done' ? '✓' : t.icon}</i>{compactMoney(e.amount, currency)}{e.override ? '✎' : ''}
                   </span>
                 );
               })}
@@ -64,6 +65,7 @@ export function CalendarLegend() {
       ))}
       <span className="legend-item"><span className="swatch bar" />Day-to-day spending</span>
       <span className="legend-item"><span className="swatch done">✓</span>Paid</span>
+      <span className="legend-item"><span className="swatch done">✎</span>Edited (click a day to change a payday)</span>
     </div>
   );
 }
