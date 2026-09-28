@@ -16,7 +16,29 @@ const errors = [];
 win.on('pageerror', (e) => errors.push(e.message));
 const results = { ok: 0, fail: [] };
 
+// Every visible text box / dropdown must be readable (not squeezed), normal height, and inside
+// its pop-up. Catches layout bugs like an amount box squashed by a currency picker.
+async function checkLayout(where, scope) {
+  const problems = await win.evaluate((scope) => {
+    const out = [];
+    const modal = document.querySelector('.modal')?.getBoundingClientRect();
+    for (const el of document.querySelectorAll(`${scope} input, ${scope} select, ${scope} textarea`)) {
+      if (['checkbox', 'radio', 'range', 'file', 'hidden'].includes(el.type)) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden') continue;
+      const name = el.getAttribute('placeholder') || el.getAttribute('aria-label') || el.closest('label')?.querySelector('span')?.textContent || el.tagName;
+      const minW = el.classList.contains('qty') ? 44 : 60;
+      if (r.width < minW) out.push(`"${name}" is only ${Math.round(r.width)}px wide`);
+      if (el.tagName !== 'TEXTAREA' && r.height > 56) out.push(`"${name}" is ${Math.round(r.height)}px tall`);
+      if (modal && scope === '.modal' && (r.right > modal.right + 1 || r.left < modal.left - 1)) out.push(`"${name}" sticks out of the pop-up`);
+    }
+    return out;
+  }, scope);
+  for (const p of problems) results.fail.push(`${where} › layout: ${p}`);
+}
+
 async function checkInputs(where, scope = 'body') {
+  await checkLayout(where, scope);
   const sel = `${scope} input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([readonly]):not([disabled]), ${scope} textarea:not([readonly]):not([disabled])`;
   const n = await win.locator(sel).count();
   for (let i = 0; i < n; i++) {

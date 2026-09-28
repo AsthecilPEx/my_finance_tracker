@@ -7,14 +7,25 @@ import { CURRENCIES, formatMoney } from '../../engine/money.js';
 import { toBase, hasRate } from '../../engine/fx.js';
 import { newId } from '../../engine/state.js';
 
-export function CurrencySelect({ value, onChange }) {
+export function CurrencySelect({ value, onChange, className = '' }) {
   const { state } = useApp();
   const base = state.settings.currency;
   const codes = [...new Set([base, ...Object.keys(CURRENCIES), ...Object.keys(state.fx?.rates || {})])];
+  // Compact labels ("GBP £") so the picker never squeezes the amount box; full name on hover.
   return (
-    <select value={value || base} onChange={(e) => onChange(e.target.value)} aria-label="Currency">
-      {codes.map((c) => <option key={c} value={c}>{c}{CURRENCIES[c] ? ` · ${CURRENCIES[c].name}` : ''}</option>)}
+    <select className={`currency-select ${className}`} value={value || base} onChange={(e) => onChange(e.target.value)} aria-label="Currency" title={CURRENCIES[value || base]?.name || value}>
+      {codes.map((c) => <option key={c} value={c} title={CURRENCIES[c]?.name}>{c}{CURRENCIES[c] ? ` ${CURRENCIES[c].symbol}` : ''}</option>)}
     </select>
+  );
+}
+
+/** Amount box with an optional currency picker beside it: same size and look on every form. */
+export function AmountInput({ value, onChange, currency, onCurrency, autoFocus, required, placeholder = '0.00', label = 'Amount' }) {
+  return (
+    <div className="amount-input">
+      <input type="number" step="0.01" min="0" inputMode="decimal" value={value} onChange={onChange} autoFocus={autoFocus} required={required} placeholder={placeholder} aria-label={label} />
+      {onCurrency && <CurrencySelect value={currency} onChange={onCurrency} />}
+    </div>
   );
 }
 
@@ -75,13 +86,10 @@ export function TxnForm({ initial, onDone }) {
         <button type="button" className={f.direction === 'out' ? 'on out' : ''} onClick={() => set('direction')('out')}>Money out</button>
         <button type="button" className={f.direction === 'in' ? 'on in' : ''} onClick={() => set('direction')('in')}>Money in</button>
       </div>
-      <div className="amount-row">
-        <Field label="Amount">
-          <input className="big-input" type="number" step="0.01" min="0" inputMode="decimal" autoFocus required value={f.amount} onChange={set('amount')} placeholder="0.00" />
-        </Field>
-        {!initial && <Field label="Currency"><CurrencySelect value={f.currency} onChange={set('currency')} /></Field>}
-      </div>
-      {!initial && <ConvertedHint amount={f.amount} currency={f.currency} />}
+      <Field label="Amount">
+        <AmountInput value={f.amount} onChange={set('amount')} currency={f.currency} onCurrency={initial ? null : set('currency')} autoFocus required />
+        {!initial && <ConvertedHint amount={f.amount} currency={f.currency} />}
+      </Field>
       <Field label="Description" hint={!f.categoryId && f.description ? `Auto-category: ${state.categories.find((c) => c.id === guessed)?.name}` : null}>
         <input value={f.description} onChange={set('description')} placeholder="e.g. Tesco, Costa, Rent" />
       </Field>
@@ -142,7 +150,7 @@ export function RecurringForm({ initial, onDone }) {
       </div>
       <div className="row2">
         <Field label="Name"><input required value={f.name} onChange={set('name')} placeholder={isIn ? 'Salary' : 'e.g. Council Tax'} /></Field>
-        <Field label="Amount"><div className="inline-row"><input className="grow" type="number" step="0.01" min="0" required value={f.amount} onChange={set('amount')} /><CurrencySelect value={f.currency} onChange={set('currency')} /></div><ConvertedHint amount={f.amount} currency={f.currency} /></Field>
+        <Field label="Amount"><AmountInput value={f.amount} onChange={set('amount')} currency={f.currency} onCurrency={set('currency')} required /><ConvertedHint amount={f.amount} currency={f.currency} /></Field>
       </div>
       <div className="row2">
         <Field label="Type">
@@ -213,7 +221,7 @@ export function DebtForm({ initial, onDone }) {
         </Field>
       </div>
       <div className="row2">
-        <Field label="Balance owed"><div className="inline-row"><input className="grow" type="number" step="0.01" min="0" required value={f.balance} onChange={set('balance')} /><CurrencySelect value={f.currency} onChange={set('currency')} /></div><ConvertedHint amount={f.balance} currency={f.currency} /></Field>
+        <Field label="Balance owed"><AmountInput label="Balance owed" value={f.balance} onChange={set('balance')} currency={f.currency} onCurrency={set('currency')} required /><ConvertedHint amount={f.balance} currency={f.currency} /></Field>
         <Field label="Interest rate (APR %)"><input type="number" step="0.01" min="0" value={f.apr} onChange={set('apr')} /></Field>
       </div>
       <div className="row2">

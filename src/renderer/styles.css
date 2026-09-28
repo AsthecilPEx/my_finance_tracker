@@ -272,7 +272,6 @@ input[type="date"] { color-scheme: dark; }
 .field > input, .field > select { color: var(--text); font-size: 14px; }
 .field small { font-size: 11px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.big-input { font-size: 28px !important; font-weight: 700; padding: 10px 14px; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 12px; padding: 4px; gap: 4px; }
 .seg button { border: 0; background: transparent; padding: 8px; border-radius: 9px; cursor: pointer; color: var(--text-2); font-weight: 600; }
 .seg button.on.out { background: #ee642833; color: #ffb08a; }
@@ -529,7 +528,6 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
 .split-summary div { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; }
 .split-summary span { font-size: 12px; color: var(--muted); }
 .split-summary b { font-size: 20px; }
-.amount-row { display: grid; grid-template-columns: 1fr 190px; gap: 10px; align-items: end; }
 .seg { margin-bottom: 4px; }
 
 /* pots + planner table */
@@ -569,3 +567,9 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
 .pay-edit { display: block; font-size: 12px; color: var(--text-2); }
 .pay-edit span { opacity: .5; }
 .pay-edit:hover span { opacity: 1; }
+
+/* amount + currency: the number always gets the room, the picker stays compact */
+.amount-input { display: grid; grid-template-columns: minmax(0, 1fr) 92px; gap: 6px; }
+.amount-input:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+.amount-input input { width: 100%; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.currency-select { width: 100%; padding-left: 8px; padding-right: 4px; }
