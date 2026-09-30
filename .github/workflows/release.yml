@@ -38,16 +38,22 @@ jobs:
       - name: Type into every input on every screen (real Windows)
         run: npm run build && npm run test:e2e
 
-      - name: Build and publish installer
-        run: npm run build && npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # Build first, then create the release with every file in one step. Letting
+      # electron-builder publish raced its two uploads (Setup + Portable) into
+      # creating the release twice, which failed before latest.yml was uploaded.
+      - name: Build installers
+        run: npm run build && npx electron-builder --win --publish never
 
-      - name: Add install notes for friends
+      - name: Publish release for friends
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cd release
+          for f in "PulseFinance-Setup-$VERSION.exe" "PulseFinance-Setup-$VERSION.exe.blockmap" "PulseFinance-Portable-$VERSION.exe" latest.yml; do
+            [ -f "$f" ] || { echo "::error::Missing $f"; ls -la; exit 1; }
+          done
+          grep -q "version: $VERSION" latest.yml || { echo "::error::latest.yml is not for $VERSION"; cat latest.yml; exit 1; }
           cat > notes.md <<NOTES
           ## Install Pulse Finance $VERSION
           1. Download **PulseFinance-Setup-$VERSION.exe** below (under *Assets*).
@@ -60,4 +66,6 @@ jobs:
 
           *Prefer not to install? Use PulseFinance-Portable-$VERSION.exe (no automatic updates).*
           NOTES
-          gh release edit "v$VERSION" --notes-file notes.md --title "Pulse Finance $VERSION"
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Pulse Finance $VERSION" --notes-file notes.md \
+            "PulseFinance-Setup-$VERSION.exe" "PulseFinance-Setup-$VERSION.exe.blockmap" \
+            "PulseFinance-Portable-$VERSION.exe" latest.yml

@@ -33,6 +33,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run dist -- --publish never
+      - name: Check the update files a release needs were built
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          cd release && ls -la
+          for f in "PulseFinance-Setup-$VERSION.exe" "PulseFinance-Setup-$VERSION.exe.blockmap" "PulseFinance-Portable-$VERSION.exe" latest.yml; do
+            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
+          done
+          cat latest.yml
       - name: Type into every input on every screen (real Windows)
         run: npm run test:e2e
       - uses: actions/upload-artifact@v4
