@@ -190,7 +190,7 @@ function OpenBanking() {
       ) : !info?.hasCredentials ? (
         <div className="steps">
           <ol>
-            <li>Create a free account at <button className="linkish" onClick={() => api.openExternal('https://enablebanking.com/sign-in/')}>enablebanking.com</button> and open <i>API applications → Register new</i>. Choose <b>Production</b> and add this redirect URL: <code className="copyable" onClick={() => api.copyText(info?.redirectUrl || '')}>{info?.redirectUrl || 'http://localhost:47285/callback'}</code></li>
+            <li>Create a free account at <button className="linkish" onClick={() => api.openExternal('https://enablebanking.com/sign-in/')}>enablebanking.com</button> and open <i>API applications → Register new</i>. Choose <b>Production</b> and add this redirect URL: <code className="copyable" onClick={() => api.copyText(info?.redirectUrl || '')}>{info?.redirectUrl || 'https://asthecilpex.github.io/my_finance_tracker/callback/'}</code></li>
             <li>Download the <b>private key (.pem)</b> it gives you, and note the <b>Application ID</b>.</li>
             <li>In the Enable Banking control panel, <b>link your own accounts</b> to the app. Restricted apps can only read linked accounts.</li>
             <li>Enter the details below. The key is encrypted with Windows' own data protection and only used to talk to Enable Banking.</li>
@@ -225,7 +225,7 @@ function OpenBanking() {
           {busy === 'connect' && (
             <div className="callout">
               <p>Approve access in the browser window that just opened. Pulse carries on automatically when you're sent back.</p>
-              <p className="muted sm">Landed on a page that didn't load? Copy its full address (it contains <code>code=</code>) and paste it here:</p>
+              <p className="muted sm">Stuck on a page after approving? Copy its full address (it contains <code>code=</code>) and paste it here:</p>
               <div className="inline-row"><input className="grow" value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} placeholder="https://…?code=…" /><button className="btn ghost" disabled={!pasteUrl} onClick={finishWithUrl}>Finish</button></div>
             </div>
           )}

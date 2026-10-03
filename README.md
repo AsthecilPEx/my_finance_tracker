@@ -49,7 +49,8 @@
 ## Getting transactions in (read-only)
 
 1. **Bank connection (Open Banking), recommended.** Pulse connects through **[Enable Banking](https://enablebanking.com/)**, a regulated provider covering 2,500+ UK and EU banks. It's free for personal use in *restricted* mode, where you link your own accounts to your own app. The access is read-only by law, and Pulse syncs up to 4 times a day. Your application key is encrypted with Windows DPAPI.
-   - Setup: create an application at enablebanking.com, add the redirect URL `http://localhost:47285/callback`, download the `.pem` key, link your accounts in their control panel, then enter the App ID and key in **Bank Sync**. If your bank sends you back to a page that doesn't load, paste its address into Pulse and it will finish the connection.
+   - Setup: create a **Production** application at enablebanking.com with the redirect URL `https://asthecilpex.github.io/my_finance_tracker/callback/`, download the `.pem` key, link your accounts in their control panel, then enter the App ID and key in **Bank Sync**.
+   - Why that address: Enable Banking only accepts `https://` redirects for production apps. That small page (in `docs/callback/`, served by GitHub Pages) hands the bank's reply straight to Pulse on your own PC (`http://localhost:47285`). It stores nothing, and the one-time code is useless without your private key. If Pulse doesn't pick it up, the page shows its address to paste into **Bank Sync**.
    - *Why not GoCardless?* GoCardless Bank Account Data (formerly Nordigen) stopped accepting new sign-ups in July 2025 and is being wound down, so v0.2 replaces it.
 2. **Watched folder.** Any bank CSV saved to a folder you choose is imported automatically, even while Pulse is in the tray.
 3. **Statement file.** Import a CSV by hand, from almost any UK/EU bank.
@@ -74,7 +75,7 @@ On Windows (Node.js 20+):
 npm install
 npm start          # build the UI and launch
 npm run dist       # Windows installer + portable exe in release/
-npm test           # 48 engine, connector and security tests
+npm test           # 57 engine, connector and security tests
 npm run dev        # hot-reload development
 ```
 

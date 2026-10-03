@@ -1,13 +1,16 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { addDays, todayISO } from '../../src/engine/dates.js';
+import { BANK_REDIRECT_URL } from '../../src/config.js';
 
 // Enable Banking: regulated UK/EU Open Banking (account information, read-only).
 // Personal use is free in "restricted" mode, where the app can only read accounts the
 // owner has linked to it in the Enable Banking control panel.
 const BASE = 'https://api.enablebanking.com';
 export const CALLBACK_PORT = 47285;
-export const REDIRECT_URL = `http://localhost:${CALLBACK_PORT}/callback`;
+// What the bank redirects to (https, registered in Enable Banking). That page forwards to LOCAL_CALLBACK.
+export const REDIRECT_URL = BANK_REDIRECT_URL;
+export const LOCAL_CALLBACK = `http://localhost:${CALLBACK_PORT}/callback`;
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const DAY = 86400000;
 
@@ -104,7 +107,7 @@ export class EnableBankingConnector {
   listen() {
     return new Promise((resolve) => {
       const server = http.createServer((req, res) => {
-        const url = new URL(req.url, REDIRECT_URL);
+        const url = new URL(req.url, LOCAL_CALLBACK);
         if (url.pathname !== '/callback') { res.writeHead(404); return res.end(); }
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
         res.end('<body style="font:16px system-ui;background:#0b0b0f;color:#fff;display:grid;place-items:center;height:100vh;margin:0"><div><h2>✓ Pulse is connected</h2><p>You can close this tab and go back to the app.</p></div></body>');
