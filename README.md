@@ -29,6 +29,8 @@
 | **Split bills** | Flip **Split** on any payment you made for others (the house shop, a group dinner). Say how much comes back, from whom and by when (optional), and whether it's on **Splitwise**. Only **your share** counts in your spending, categories, caps and receipts. When the money arrives, link it to one or more splits, including partial payments. Repayments are never counted as income. |
 | **Any currency, live rates** | Bills, debts and EMIs can be in any currency, e.g. an Indian home loan in ₹. Pulse downloads daily reference rates (ECB via Frankfurter, with ExchangeRate-API as fallback) every time it runs. It re-converts every total, forecast and insight, and tells you when a rate change makes a bill cost more ("your ₹25,000 EMI costs £3.60 more than last month"). |
 | **Needs your attention** | A dedicated dashboard panel for questions only you can answer. Is this a **transfer between your own accounts** (so it isn't counted as money in)? What is this money in: income, a transfer or a split repayment? Which category does this belong to? Has an overdue split been paid? |
+| **Bills that change every time** | Tick **Amount changes each time** for energy, water or phone usage. Pulse plans with the average of your last 3 payments (shown as ≈), ticks the bill off whatever the real amount is, asks you for the real bill under *Needs your attention* when it's due, and flags a bill that comes in well above usual. It also spots these bills in your statements by itself. |
+| **Credit cards, properly** | Say how you pay each card: the **minimum**, the **full statement balance** or a **fixed amount**, plus its statement day. For "pay in full", Pulse estimates the statement from your recent payments and, from your statement day, asks for the real amount. Card balances (and Monzo Flex) are never counted as spendable money. |
 | **Pots** | See your bills pot, goal pots and money owed to you in one place, and record moves with one click using the amounts from your payday routine. |
 | **Everything from v1** | Glowing category meters, payday calendar, bills (compulsory vs optional), auto-detected subscriptions, debts with avalanche/snowball planning, insights, desktop widget, tray and reminders. |
 
@@ -48,14 +50,11 @@
 
 ## Getting transactions in (read-only)
 
-1. **Bank connection (Open Banking), recommended.** Pulse connects through **[Enable Banking](https://enablebanking.com/)**, a regulated provider covering 2,500+ UK and EU banks. It's free for personal use in *restricted* mode, where you link your own accounts to your own app. The access is read-only by law, and Pulse syncs up to 4 times a day. Your application key is encrypted with Windows DPAPI.
-   - Setup: create a **Production** application at enablebanking.com with the redirect URL `https://asthecilpex.github.io/my_finance_tracker/callback/`, download the `.pem` key, link your accounts in their control panel, then enter the App ID and key in **Bank Sync**.
-   - Why that address: Enable Banking only accepts `https://` redirects for production apps. That small page (in `docs/callback/`, served by GitHub Pages) hands the bank's reply straight to Pulse on your own PC (`http://localhost:47285`). It stores nothing, and the one-time code is useless without your private key. If Pulse doesn't pick it up, the page shows its address to paste into **Bank Sync**.
-   - *Why not GoCardless?* GoCardless Bank Account Data (formerly Nordigen) stopped accepting new sign-ups in July 2025 and is being wound down, so v0.2 replaces it.
-2. **Watched folder.** Any bank CSV saved to a folder you choose is imported automatically, even while Pulse is in the tray.
-3. **Statement file.** Import a CSV by hand, from almost any UK/EU bank.
+1. **Monzo: live sync.** Uses Monzo's own free developer access for your own accounts: current, joint and **Flex**. Create a *Confidential* client at developers.monzo.com with the redirect URL `http://localhost:47286/monzo/callback`, enter its ID and secret in **Bank Sync**, open Monzo's email link on your PC and approve Pulse in the Monzo app. Approve within 5 minutes and your full history comes in (Monzo limits it to 90 days after that). Monzo asks you to re-approve every 90 days and Pulse reminds you a week before. Flex repayments are recognised as transfers, so nothing is counted twice.
+2. **Statements: Lloyds, Halifax, HSBC, Barclays, Revolut, Starling, Nationwide and more.** Pulse recognises each bank's CSV format automatically (HSBC's header-less layout, Barclays' padded memos, Revolut's pending/declined rows and fees, Lloyds' debit/credit columns). Point the **watched folder** at your Downloads and every statement you download is imported by itself. Anything already in Pulse is skipped. **Bank Sync** shows how up to date each bank is and where its download button lives, and Pulse reminds you when a statement is over a week old.
+3. **EU/EEA banks: Enable Banking.** A regulated Open Banking provider, free for personal use in *restricted* mode, which covers EU/EEA banks only (not the UK). Production apps need an `https://` redirect, so register `https://asthecilpex.github.io/my_finance_tracker/callback/`. That small page (in `docs/callback/`, served by GitHub Pages) hands the bank's reply straight to Pulse on your own PC (`http://localhost:47285`). It stores nothing, and the one-time code is useless without your private key.
 
-These fallbacks stay because Open Banking depends on a third party and on each bank's consent rules. They live under *Bank Sync → Other ways*, out of the everyday flow. The same payment arriving by two routes is de-duplicated.
+*Why UK banks other than Monzo can't sync live:* UK Open Banking data is only available to regulated companies under a business contract (TrueLayer, Yapily, Plaid, Enable Banking's paid tier). GoCardless Bank Account Data, the old free option, closed to new sign-ups in 2025.
 
 ## Releasing a new version (for the maintainer)
 
@@ -75,16 +74,17 @@ On Windows (Node.js 20+):
 npm install
 npm start          # build the UI and launch
 npm run dist       # Windows installer + portable exe in release/
-npm test           # 57 engine, connector and security tests
+npm test           # 78 engine, connector, bank-format and security tests
 npm run dev        # hot-reload development
 ```
 
 ## Security
 
-- **One way out to the internet.** All network traffic goes through a single gateway in the background process. It allows HTTPS only, to an allow-list of services (Enable Banking and the two exchange-rate providers). It follows redirects only to allowed hosts and enforces timeouts and response-size limits. TLS certificates are checked by Chromium against Windows' certificate store.
+- **One way out to the internet.** All network traffic goes through a single gateway in the background process. It allows HTTPS only, to an allow-list of services (Monzo's API, Enable Banking and the two exchange-rate providers). It follows redirects only to allowed hosts and enforces timeouts and response-size limits. TLS certificates are checked by Chromium against Windows' certificate store.
 - **The UI is offline.** Its web requests are blocked except local app files and bank logos, it runs in a sandbox with no Node.js, all web permissions (camera, notifications, etc.) are denied, and it has a strict Content-Security-Policy.
 - **Tamper-resistant build.** Electron fuses disable running the app as plain Node, `NODE_OPTIONS` injection and debugger attachment, and only load code from the signed app archive.
-- **Secrets encrypted** with Windows DPAPI. Receipt photos are referenced by random IDs only (path traversal is blocked).
+- **Sign-in redirects stay on your PC.** When you connect Monzo or Enable Banking, Pulse briefly listens on `localhost` only (never your network) for the bank's reply, checks it belongs to the request it started, then stops listening.
+- **Secrets encrypted** with Windows DPAPI (bank keys, Monzo client secret and tokens). Receipt photos are referenced by random IDs only (path traversal is blocked).
 - No software can honestly promise to be attack-proof. Keep Windows updated, and code-sign the installer before sharing it widely.
 
 ## Your data and privacy

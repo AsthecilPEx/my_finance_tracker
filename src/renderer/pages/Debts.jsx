@@ -6,6 +6,7 @@ import { DEBT_TYPES, simulatePayoff, monthlyInterest } from '../../engine/debt.j
 import { addMonths, ordinal, parseISO } from '../../engine/dates.js';
 import { financialView } from '../../engine/view.js';
 import { formatMoney } from '../../engine/money.js';
+import { debtPayment } from '../../engine/summary.js';
 
 function payoffDate(today, months) {
   if (!isFinite(months)) return 'Never at this rate';
@@ -51,7 +52,7 @@ export default function Debts() {
             return (
               <div key={d.id} className="card debt">
                 <div className="card-head">
-                  <div><h3>{d.name}</h3><span className="muted sm">{DEBT_TYPES[d.type] || d.type}{d.dueDay ? ` · due on the ${ordinal(d.dueDay)}` : ''}</span></div>
+                  <div><h3>{d.name}</h3><span className="muted sm">{DEBT_TYPES[d.type] || d.type}{d.dueDay ? ` · due on the ${ordinal(d.dueDay)}` : ''}{d.statementDay ? ` · statement on the ${ordinal(d.statementDay)}` : ''}{d.payMode === 'full' ? ' · paid in full' : d.payMode === 'fixed' ? ' · fixed payment' : ''}</span></div>
                   <div className="row-actions">
                     <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.debts.find((x) => x.id === d.id))}>✎</button>
                     <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'debt/delete', payload: { id: d.id } })}>🗑</button>
@@ -63,7 +64,7 @@ export default function Debts() {
                 <div className="debt-meta">
                   <span>{Math.round(paid * 100)}% paid off</span>
                   <span className={d.apr >= 15 ? 'neg' : ''}>{d.apr || 0}% APR</span>
-                  <span>{d.native ? formatMoney(d.native.minPayment, d.native.currency) : fmt(d.minPayment || 0)}/mo</span>
+                  <span>{d.payMode === 'full' ? <>≈ {fmt(debtPayment(d, view.transactions)?.amount || 0)}</> : d.payMode === 'fixed' ? fmt(d.fixedPayment || 0) : d.native ? formatMoney(d.native.minPayment, d.native.currency) : fmt(d.minPayment || 0)}/mo</span>
                 </div>
                 <div className="muted sm">Cleared {payoffDate(today, plans.avalanche.payoffMonth[d.id] ?? Infinity)} on the plan below</div>
               </div>

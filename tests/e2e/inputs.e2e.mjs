@@ -128,12 +128,21 @@ await win.getByRole('button', { name: '+ Add row' }).click(); await checkInputs(
 await nav('Bills & Income'); await win.getByRole('button', { name: '+ Add recurring' }).click(); await checkInputs('Add recurring', '.modal');
 await win.locator('.modal select:has(option[value=weekly])').selectOption('weekly'); await checkInputs('Add recurring weekly', '.modal'); await closeModal();
 await win.getByLabel('Edit').first().click(); await checkInputs('Edit recurring', '.modal'); await closeModal();
-await nav('Debts & Loans'); await win.getByRole('button', { name: '+ Add debt' }).click(); await checkInputs('Add debt', '.modal'); await closeModal();
+await win.getByRole('button', { name: '+ Add recurring' }).click();
+await win.getByText('Amount changes each time').click(); await checkInputs('Add recurring (amount varies)', '.modal'); await closeModal();
+await nav('Debts & Loans'); await win.getByRole('button', { name: '+ Add debt' }).click(); await checkInputs('Add debt', '.modal');
+await win.locator('.modal select:has(option[value=full])').selectOption('full'); await checkInputs('Add debt (pay in full)', '.modal');
+await win.locator('.modal select:has(option[value=full])').selectOption('fixed'); await checkInputs('Add debt (fixed payment)', '.modal'); await closeModal();
 await win.getByLabel('Edit').first().click(); await checkInputs('Edit debt', '.modal'); await closeModal();
 await nav('Budgets & Caps'); await win.getByRole('button', { name: '+ New cap' }).click(); await checkInputs('New cap', '.modal'); await closeModal();
 await win.getByLabel('Edit cap').first().click(); await checkInputs('Edit cap', '.modal'); await closeModal();
 await nav('Pay Planner'); await win.getByRole('button', { name: '+ New goal' }).click(); await checkInputs('New goal', '.modal'); await closeModal();
 await win.getByLabel('Edit goal').first().click(); await checkInputs('Edit goal', '.modal'); await closeModal();
+// Bank Sync: Monzo setup form, statement guides and the EU section.
+await nav('Bank Sync');
+await win.getByRole('button', { name: /Set up Monzo/ }).click(); await checkInputs('Bank Sync › Monzo setup');
+await win.getByText("Where's the download button for my bank?").click();
+await win.getByText(/EU \/ EEA banks/).click(); await checkInputs('Bank Sync › EU banks');
 // Edit a single payday from the calendar and check the change flows through.
 await nav('Dashboard');
 await win.getByLabel('Next month').click();
@@ -145,7 +154,7 @@ await closeModal(); // discard the test typing (it also changed the date), then 
 await win.getByRole('button', { name: '✎ Edit' }).first().click();
 await win.locator('.modal input[type=number]').first().fill('1234.5');
 await win.locator('.modal input').filter({ hasNot: win.locator('[type]') }).last().fill('Test: 2 days unpaid').catch(() => {});
-await win.getByRole('button', { name: 'Save' }).click();
+await win.locator('.modal').getByRole('button', { name: 'Save', exact: true }).click();
 await win.waitForTimeout(300);
 const edited = await win.locator('.list-row', { hasText: '✎ edited' }).count();
 const chipEdited = await win.locator('.chip.edited').count();
@@ -159,6 +168,17 @@ if ((await win.locator('.hero-num').innerText()) !== leftBefore) results.fail.pu
 await nav('Pay Planner');
 await win.locator('.pay-edit').first().click();
 await checkInputs('Planner › Edit payday', '.modal'); await closeModal();
+// A bill whose amount varies: entering the real amount from "Needs your attention" clears the question.
+await nav('Dashboard');
+const billQ = win.locator('.review-item.bill-amount');
+if (await billQ.count()) {
+  await billQ.first().locator('input[type=number]').fill('123.45');
+  await billQ.first().getByRole('button', { name: 'Save amount' }).click();
+  await win.waitForTimeout(300);
+  const left = await win.locator('.review-item.bill-amount').count();
+  if (left) results.fail.push('Entering a variable bill amount did not clear the attention item');
+  else results.ok++;
+}
 await nav('Dashboard'); await checkInputs('Dashboard after all');
 
 console.log(`inputs typed OK: ${results.ok}`);

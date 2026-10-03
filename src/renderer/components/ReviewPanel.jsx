@@ -49,6 +49,7 @@ export default function ReviewPanel() {
                     </div>
                   )}
                   {it.kind === 'split-overdue' && <SplitOverdueActions it={it} />}
+                  {it.kind === 'bill-amount' && <BillAmount it={it} />}
                   <button className="linkish muted sm" onClick={() => later(it.key)}>Not now</button>
                 </div>
               </div>
@@ -71,5 +72,24 @@ function SplitOverdueActions({ it }) {
       <button className="btn ghost sm" onClick={() => { dispatch({ type: 'split/writeOff', payload: { id: s.txn.id, amount: s.outstanding + (s.txn.split.writtenOff || 0) } }); notify('Marked as paid back', 'good'); }}>Paid back in cash / elsewhere</button>
       <button className="btn ghost sm" onClick={() => { dispatch({ type: 'txn/split', payload: { id: s.txn.id, split: { ...s.txn.split, owed: s.paid } } }); notify(`${fmt(s.outstanding)} now counts as your spending`, 'info'); }}>They won't pay: count it as mine</button>
     </>
+  );
+}
+
+function BillAmount({ it }) {
+  const { dispatch, notify, fmt } = useApp();
+  const [amount, setAmount] = useState('');
+  const save = (e) => {
+    e.preventDefault();
+    const n = parseFloat(amount);
+    if (!(n >= 0)) return;
+    dispatch({ type: 'occ/override', payload: { key: it.occKey, amount: n } });
+    notify(`Saved: ${fmt(n)} due ${it.date}. Your plan is updated.`, 'good');
+  };
+  return (
+    <form className="inline-row" onSubmit={save}>
+      <input type="number" step="0.01" min="0" inputMode="decimal" className="amount-sm" placeholder={it.estimate.toFixed(2)} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Real amount" />
+      <button className="btn primary sm" disabled={amount === ''}>Save amount</button>
+      <button type="button" className="btn ghost sm" onClick={() => { dispatch({ type: 'occ/override', payload: { key: it.occKey, amount: it.estimate } }); notify('Using the estimate', 'info'); }}>Estimate is right</button>
+    </form>
   );
 }

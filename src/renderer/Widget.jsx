@@ -53,7 +53,7 @@ export default function Widget() {
             <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
             <span className="grow">{e.name}</span>
             <span className="muted">{e.inDays === 0 ? 'today' : e.inDays === 1 ? 'tmrw' : shortDate(e.date)}</span>
-            <b>{fmt(-e.amount, { decimals: 0 })}</b>
+            <b>{e.estimated ? '≈' : ''}{fmt(-e.amount, { decimals: 0 })}</b>
           </div>
         ))}
       </div>

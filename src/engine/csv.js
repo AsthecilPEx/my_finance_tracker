@@ -12,6 +12,75 @@ const COLS = {
   credit: ['paid in', 'credit', 'credit amount', 'money in', 'deposits', 'in', 'received'],
 };
 
+/**
+ * Known UK bank export formats. Each is recognised from its header row (or, for HSBC, its
+ * header-less 3-column layout) so imports need no column matching. `row` adjusts a parsed row
+ * for bank quirks and may return null to skip it (e.g. Revolut's declined or reverted lines).
+ */
+export const BANK_FORMATS = {
+  lloyds: {
+    name: 'Lloyds / Halifax / Bank of Scotland',
+    detect: (h) => h.includes('transaction date') && h.includes('transaction description') && h.includes('debit amount') && h.includes('sort code'),
+    howTo: 'App or website → your account → "Download transactions" (or "Export") → choose CSV and the date range.',
+  },
+  hsbc: {
+    name: 'HSBC UK',
+    // HSBC's CSV has no header row: date, description, signed amount.
+    detectRows: (rows) => rows.length > 0 && rows.slice(0, 5).every((r) => r.filter((c) => String(c).trim()).length === 3 && parseStatementDate(r[0]) && parseAmount(r[2]) !== null),
+    howTo: 'Online banking (website) → your account → "Download" under the transactions list → choose CSV.',
+  },
+  barclays: {
+    name: 'Barclays',
+    detect: (h) => h.includes('memo') && h.includes('subcategory') && h.includes('amount') && h.includes('number'),
+    // Memo looks like "TESCO STORES 2041   ON 12 SEP          BCC": keep the payee part.
+    row: (row) => ({ ...row, description: cleanBarclaysMemo(row.description) }),
+    howTo: 'Online banking (website) → your account → "Export" or "Download transactions" → choose CSV.',
+  },
+  revolut: {
+    name: 'Revolut',
+    detect: (h) => h.includes('started date') && h.includes('completed date') && h.includes('state'),
+    skip: (get) => String(get('state')).trim().toUpperCase() !== 'COMPLETED', // pending, declined, reverted
+    row: (row, get) => {
+      const fee = parseAmount(get('fee')) || 0;
+      const currency = String(get('currency') || '').trim().toUpperCase();
+      return { ...row, amount: Math.round((row.amount - Math.abs(fee)) * 100) / 100, ...(currency ? { currency } : {}), account: `Revolut ${String(get('product') || '').trim()}`.trim() };
+    },
+    howTo: 'Revolut app → tap your account → ⋯ → "Statement" → choose Excel/CSV and the period → save or share it to your PC.',
+  },
+  monzo: {
+    name: 'Monzo',
+    detect: (h) => h.includes('transaction id') && h.includes('emoji') && h.includes('money out'),
+    howTo: 'Better: connect Monzo live in Bank Sync. Or: Monzo app → account → "Export transactions" → CSV.',
+  },
+  starling: {
+    name: 'Starling',
+    detect: (h) => h.includes('counter party') && h.includes('spending category'),
+    howTo: 'Starling app → Account → Statements → "Export" → CSV.',
+  },
+  nationwide: {
+    name: 'Nationwide',
+    detect: (h) => h.includes('paid out') && h.includes('paid in') && h.includes('transaction type'),
+    howTo: 'Internet banking → your account → "Download transactions" → CSV.',
+  },
+};
+
+function cleanBarclaysMemo(memo) {
+  // Drop the card-payment date stamp ("ON 01 SEP ... BCC/CPM") and squeeze the padding.
+  const s = String(memo || '').replace(/\s+ON \d{1,2} [A-Z]{3}\b.*$/i, '').replace(/\s+/g, ' ').trim();
+  return s || String(memo || '').trim();
+}
+
+/** Which known bank produced this statement (by header row), or null. */
+export function detectBank(headers, dataRows = []) {
+  for (const [id, f] of Object.entries(BANK_FORMATS)) {
+    if (f.detect && headers && f.detect(headers)) return id;
+  }
+  for (const [id, f] of Object.entries(BANK_FORMATS)) {
+    if (f.detectRows && f.detectRows(dataRows)) return id;
+  }
+  return null;
+}
+
 const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11 };
 
 /** Parse a statement date. UK/EU banks are day-first, so DD/MM is assumed over MM/DD. */
@@ -69,7 +138,7 @@ function findColumn(headers, candidates) {
  * Returns { rows, mapping, errors }. Throws if no usable columns are found.
  */
 export function parseStatement(text, { invertSign = false } = {}) {
-  const parsed = Papa.parse(String(text).replace(/^﻿/, ''), { skipEmptyLines: true });
+  const parsed = Papa.parse(String(text).replace(/^\uFEFF/, ''), { skipEmptyLines: true });
   const data = parsed.data;
   // Some banks (e.g. Nationwide) put account info above the header row.
   let headerIdx = -1;
@@ -90,12 +159,21 @@ export function parseStatement(text, { invertSign = false } = {}) {
       break;
     }
   }
+  let bank = mapping ? detectBank(mapping.headers) : null;
+  if (!mapping && detectBank(null, data) === 'hsbc') {
+    bank = 'hsbc';
+    mapping = { date: 0, description: 1, amount: 2, debit: -1, credit: -1, headers: null };
+  }
   if (!mapping) throw new Error('Could not find date and amount columns in this file.');
+  const format = bank ? BANK_FORMATS[bank] : null;
 
   const rows = [];
   const errors = [];
+  let skipped = 0;
   for (let i = headerIdx + 1; i < data.length; i++) {
     const r = data[i];
+    const get = (col) => (mapping.headers ? r[mapping.headers.indexOf(col)] : undefined);
+    if (format?.skip?.(get)) { skipped++; continue; }
     const date = parseStatementDate(r[mapping.date]);
     let amount = null;
     if (mapping.amount !== -1) amount = parseAmount(r[mapping.amount]);
@@ -110,7 +188,12 @@ export function parseStatement(text, { invertSign = false } = {}) {
       continue;
     }
     const description = mapping.description !== -1 ? String(r[mapping.description] ?? '').trim() : '';
-    rows.push({ date, amount: invertSign ? -amount : amount, description: description || 'Unknown' });
+    let row = { date, amount, description: description || 'Unknown' };
+    if (format?.row) row = format.row(row, get);
+    if (invertSign) row.amount = -row.amount;
+    if (!row.account && format) row.account = format.name.split(' / ')[0];
+    if (format) row.bank = bank;
+    rows.push(row);
   }
-  return { rows, mapping, errors };
+  return { rows, mapping, errors, bank, bankName: format?.name || null, skipped };
 }

@@ -126,6 +126,39 @@ export function nextOccurrence(item, from, extraHolidays) {
   return occurrencesBetween(item, from, addDays(from, 400), extraHolidays)[0] || null;
 }
 
+/** The words a bill is recognised by in bank descriptions ("match" field, or its name). */
+export function matchWords(item) {
+  return String(item.match || item.name || '').toLowerCase().split(/[,|]/).map((w) => w.trim()).filter(Boolean);
+}
+
+/**
+ * The most recent real payments for a schedule item (newest first), as positive amounts.
+ * Used to estimate bills whose amount changes every time (energy, water, card statements).
+ */
+export function recentActuals(item, transactions, { before = '9999-12-31', n = 3, outgoing = true } = {}) {
+  const words = matchWords(item);
+  if (!words.length) return [];
+  return transactions
+    .filter((t) => {
+      const amt = t.rawAmount ?? t.amount;
+      if (outgoing ? amt >= 0 : amt <= 0) return false;
+      if (t.date >= before || t.categoryId === 'transfer') return false;
+      if (t.recurringId && t.recurringId === item.id) return true;
+      const desc = (t.description || '').toLowerCase();
+      return words.some((w) => desc.includes(w));
+    })
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, n)
+    .map((t) => Math.abs(t.rawAmount ?? t.amount));
+}
+
+/** Estimate for a variable bill: the average of the last three payments, or the typed amount. */
+export function estimateAmount(item, transactions, opts) {
+  const recent = recentActuals(item, transactions, opts);
+  if (!recent.length) return Math.abs(Number(item.amount) || 0);
+  return round2(recent.reduce((s, a) => s + a, 0) / recent.length);
+}
+
 /**
  * Match expected occurrences to real transactions so the app knows what has
  * actually been paid / received. Each transaction is used at most once.
@@ -146,7 +179,8 @@ export function matchOccurrences(occurrences, transactions) {
       const amountOk = Math.abs(Math.abs(amt) - Math.abs(occ.amount)) <= tolerance;
       const desc = (t.description || '').toLowerCase();
       const textOk = t.recurringId === occ.sourceId || words.some((w) => desc.includes(w));
-      if (!textOk || (!amountOk && t.recurringId !== occ.sourceId)) continue;
+      // Variable bills (usage-based, card statements) match on payee and date only: any amount is right.
+      if (!textOk || (!amountOk && !occ.variable && t.recurringId !== occ.sourceId)) continue;
       if (gap < bestGap) { best = t; bestGap = gap; }
     }
     if (best) {
@@ -166,6 +200,9 @@ const INTERVALS = [
   { frequency: 'quarterly', min: 85, max: 97 },
   { frequency: 'yearly', min: 355, max: 375 },
 ];
+
+// Categories where a regular payment whose amount changes is normal (metered bills, card repayments).
+const VARIABLE_CATEGORIES = new Set(['utilities', 'debt', 'housing', 'insurance', 'transport', 'education']);
 
 const OPTIONAL_CATEGORIES = new Set(['subscriptions', 'health', 'entertainment', 'coffee', 'eating_out', 'shopping', 'personal']);
 
@@ -196,9 +233,13 @@ export function detectRecurring(transactions, existing = [], userRules = []) {
     const amounts = txns.map((t) => Math.abs(t.amount));
     const medAmt = median(amounts);
     const spread = Math.max(...amounts.map((a) => Math.abs(a - medAmt))) / medAmt;
-    if (spread > 0.25) continue;
     const merchant = key.split('|')[0];
     const last = txns[txns.length - 1];
+    // Steady amounts are subscriptions / direct debits. Amounts that move a lot on a regular date
+    // are usage-based bills (energy, water, phone) or card repayments: suggest those as "amount varies".
+    const variableCat = txns[0].amount < 0 && VARIABLE_CATEGORIES.has(last.categoryId || categorise(last.description, last.amount, userRules));
+    if (spread > 0.25 && !(variableCat && spread <= 10)) continue;
+    const variable = spread > 0.25;
     const lastDesc = (last.description || '').toLowerCase();
     if (tracked.some((w) => merchant.includes(w) || w.includes(merchant) || w.split(/[,|]/).some((x) => x.trim() && lastDesc.includes(x.trim())))) continue;
 
@@ -215,7 +256,8 @@ export function detectRecurring(transactions, existing = [], userRules = []) {
     suggestions.push({
       name: prettyName(last.description),
       match: merchant,
-      amount: round2(amounts[amounts.length - 1]),
+      amount: variable ? round2(amounts.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, amounts.length)) : round2(amounts[amounts.length - 1]),
+      ...(variable ? { variable: true } : {}),
       direction,
       frequency: interval.frequency,
       dayOfMonth,
@@ -225,8 +267,8 @@ export function detectRecurring(transactions, existing = [], userRules = []) {
       categoryId,
       kind: direction === 'in' ? (categoryId === 'salary' ? 'salary' : 'income') : categoryId === 'subscriptions' ? 'subscription' : 'bill',
       compulsory: direction === 'out' && !OPTIONAL_CATEGORIES.has(categoryId),
-      confidence: round2(Math.min(1, regular * (1 - spread) * Math.min(1, txns.length / 5))),
-      amountChanged,
+      confidence: round2(Math.min(1, regular * (variable ? 0.6 : 1 - spread) * Math.min(1, txns.length / 5))),
+      amountChanged: variable ? null : amountChanged,
     });
   }
   return suggestions.sort((a, b) => b.confidence - a.confidence || b.amount - a.amount);

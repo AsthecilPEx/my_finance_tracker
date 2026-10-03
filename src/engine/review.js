@@ -6,7 +6,37 @@
 import { addDays, daysBetween } from './dates.js';
 import { categoryMap } from './categories.js';
 import { openSplits } from './split.js';
-import { round2 } from './money.js';
+import { round2, formatMoney } from './money.js';
+import { buildOccurrences } from './summary.js';
+import { matchOccurrences } from './recurring.js';
+import { financialView } from './view.js';
+
+/** The statement date that comes before a card payment due on `due` (monthly cycle). */
+export function statementDateBefore(due, statementDay) {
+  const [y, m] = due.split('-').map(Number);
+  for (const back of [0, 1]) {
+    const yy = m - back < 1 ? y - 1 : y;
+    const mm = ((m - 1 - back + 12) % 12) + 1;
+    const dim = new Date(yy, mm, 0).getDate();
+    const iso = `${yy}-${String(mm).padStart(2, '0')}-${String(Math.min(statementDay, dim)).padStart(2, '0')}`;
+    if (iso < due) return iso;
+  }
+  return addDays(due, -25);
+}
+
+/**
+ * Bills whose amount changes (usage-based, card statements in "pay in full" mode) that are coming
+ * up and still on an estimate: ask for the real amount. Bills show from 5 days before they're due
+ * (until paid); cards show from their statement date.
+ */
+export function billsNeedingAmounts(state, today) {
+  const view = financialView(state);
+  const occ = matchOccurrences(buildOccurrences(state, addDays(today, -3), addDays(today, 31)), view.transactions.filter((t) => t.date >= addDays(today, -40)));
+  return occ
+    .filter((o) => o.variable && o.estimated && !o.matchedTxnId && o.amount <= 0)
+    .map((o) => ({ ...o, opensOn: o.statementDay ? statementDateBefore(o.date, o.statementDay) : addDays(o.date, -5) }))
+    .filter((o) => today >= o.opensOn);
+}
 
 const TRANSFER_WORDS = /\b(transfer|tfr|trf|to savings|from savings|own account|internal|pot|between accounts|faster payment from|fps from|moved from|moved to)\b/i;
 
@@ -56,6 +86,16 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     if (dismissed.has(key)) continue;
     items.push({ key, kind: 'split-overdue', icon: '🤝', txnIds: [s.txn.id], amount: round2(s.outstanding), date: s.txn.date,
       title: `${s.txn.split.who || 'Someone'} still owes you`, detail: `For ${s.txn.description} on ${s.txn.date}. Expected by ${s.txn.split.expectedBy}.${s.txn.split.trackedElsewhere ? '' : ' Not on Splitwise yet.'}` });
+  }
+
+  // 5) Bills that change every time and are due soon: what's the real amount?
+  for (const o of billsNeedingAmounts(state, today)) {
+    const key = `amount:${o.key}`;
+    if (dismissed.has(key)) continue;
+    const card = o.source === 'debt';
+    items.push({ key, kind: 'bill-amount', icon: card ? '💳' : '🧾', occKey: o.key, amount: -o.amount, date: o.date, estimate: -o.amount,
+      title: card ? `${o.name} statement: how much is due?` : `${o.name}: what's this bill?`,
+      detail: `Due ${o.date}. Pulse is planning ≈ ${formatMoney(-o.amount, state.settings?.currency || 'GBP')} from your recent payments. Enter the real amount once it's out.` });
   }
 
   items.sort((a, b) => b.date.localeCompare(a.date));

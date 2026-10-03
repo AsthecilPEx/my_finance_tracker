@@ -213,7 +213,7 @@ export class EnableBankingConnector {
     }
     const before = this.getState().transactions.length;
     await this.dispatch({ type: 'txn/import', payload: { rows, source: 'bank', fileName: bank.institutionName } });
-    if (balances.length) await this.dispatch({ type: 'accounts/set', payload: balances });
+    if (balances.length) await this.dispatch({ type: 'accounts/set', payload: { source: 'bank', accounts: balances } });
     await this.dispatch({ type: 'settings/update', payload: { bank: { lastSync: new Date().toISOString() } } });
     return { added: this.getState().transactions.length - before };
   }
@@ -238,7 +238,7 @@ export class EnableBankingConnector {
       try { await this.request(`/sessions/${bank.sessionId}`, { method: 'DELETE' }); } catch { /* already gone */ }
     }
     await this.dispatch({ type: 'settings/update', payload: { bank: { connected: false, needsReconnect: false, sessionId: '', accounts: [], lastSync: null, expires: null } } });
-    await this.dispatch({ type: 'accounts/set', payload: [] });
+    await this.dispatch({ type: 'accounts/set', payload: { source: 'bank', accounts: [] } });
   }
 
   stop() {

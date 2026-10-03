@@ -171,7 +171,7 @@ export default function Dashboard({ go }) {
                       <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
                       <span className="grow">{e.name}<small className="muted"> · {EVENT_TYPES[e.type].label}{e.compulsory ? ' · compulsory' : ''}</small></span>
                       <span className={`badge ${e.status}`}>{e.status === 'done' ? '✓ Paid' : e.status === 'assumed' ? 'Not seen' : 'Due'}</span>
-                      <b className={e.amount > 0 ? 'pos' : ''}>{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag" title={e.override.note || 'Edited'}> ✎ edited</small>}</b>
+                      <b className={e.amount > 0 ? 'pos' : ''}>{e.estimated && e.status !== 'done' ? '≈ ' : ''}{fmt(e.amount, { sign: true })}{e.estimated && e.status !== 'done' && <small className="edited-tag" title="Amount varies: estimated from your recent payments"> est.</small>}{e.override && <small className="edited-tag" title={e.override.note || 'Edited'}> ✎ edited</small>}</b>
                       <button className="btn ghost sm" onClick={() => setEditOcc(e)} title={e.amount > 0 ? 'Change the amount or date of this payday' : 'Change this one payment'}>✎ Edit</button>
                     </li>
                   ))}
@@ -204,7 +204,7 @@ export default function Dashboard({ go }) {
                     <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
                     <span className="grow">{e.name}<small className="muted"> · {weekdayShort(e.date)} {shortDate(e.date)}</small></span>
                     {e.compulsory && <span className="badge must">Must pay</span>}
-                    <b className={e.amount > 0 ? 'pos' : ''}>{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag"> ✎</small>}</b>
+                    <b className={e.amount > 0 ? 'pos' : ''}>{e.estimated ? '≈ ' : ''}{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag"> ✎</small>}</b>
                     <button className="icon-btn" aria-label={`Edit ${e.name} on ${e.date}`} title="Edit this one" onClick={() => setEditOcc(e)}>✎</button>
                   </li>
                 ))}

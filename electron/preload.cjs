@@ -52,6 +52,15 @@ contextBridge.exposeInMainWorld('pulse', {
     sync: () => invoke('bank:sync'),
     disconnect: () => invoke('bank:disconnect'),
   },
+  monzo: {
+    info: () => invoke('monzo:info'),
+    saveClient: (id, secret) => invoke('monzo:saveClient', id, secret),
+    connect: () => invoke('monzo:connect'),
+    completeWithUrl: (url) => invoke('monzo:completeWithUrl', url),
+    checkApproval: () => invoke('monzo:checkApproval'),
+    sync: () => invoke('monzo:sync'),
+    disconnect: () => invoke('monzo:disconnect'),
+  },
   watcher: {
     status: () => invoke('watcher:status'),
     scanNow: () => invoke('watcher:scan'),

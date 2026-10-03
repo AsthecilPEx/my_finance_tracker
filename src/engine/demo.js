@@ -48,7 +48,7 @@ export function createDemoState(today) {
   state.recurring = [
     rec({ name: 'Rent', match: 'openrent', amount: 1050, direction: 'out', kind: 'bill', categoryId: 'housing', dayOfMonth: 1, compulsory: true }),
     rec({ name: 'Council Tax', match: 'council tax', amount: 148, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 1, compulsory: true }),
-    rec({ name: 'Octopus Energy', match: 'octopus', amount: 96, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 5, compulsory: true }),
+    rec({ name: 'Octopus Energy', match: 'octopus', amount: 96, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 5, compulsory: true, variable: true }),
     rec({ name: 'Admiral Car Insurance', match: 'admiral', amount: 58, direction: 'out', kind: 'bill', categoryId: 'insurance', dayOfMonth: 10, compulsory: true }),
     rec({ name: 'Thames Water', match: 'thames water', amount: 38, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 12, compulsory: true }),
     rec({ name: 'Vodafone', match: 'vodafone', amount: 22, direction: 'out', kind: 'bill', categoryId: 'utilities', dayOfMonth: 18, compulsory: true }),

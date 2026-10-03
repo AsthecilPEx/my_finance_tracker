@@ -1,5 +1,5 @@
 import { addDays, daysBetween, daysInMonth, lastMonths, monthEnd, monthStart, parseISO, toISO } from './dates.js';
-import { occurrencesBetween, matchOccurrences, nextOccurrence } from './recurring.js';
+import { occurrencesBetween, matchOccurrences, nextOccurrence, estimateAmount } from './recurring.js';
 import { categoryMap, SPENDING_TYPES } from './categories.js';
 import { round2, sum } from './money.js';
 import { monthlyInterest } from './debt.js';
@@ -33,13 +33,18 @@ export function buildOccurrences(state, from, to) {
       occ.scheduledDate = occ.date;
       occ.scheduledAmount = occ.amount;
       if (o.date) occ.date = o.date;
-      if (typeof o.amount === 'number' && isFinite(o.amount)) occ.amount = occ.amount < 0 ? -Math.abs(o.amount) : Math.abs(o.amount);
+      if (typeof o.amount === 'number' && isFinite(o.amount)) {
+        occ.amount = occ.amount < 0 ? -Math.abs(o.amount) : Math.abs(o.amount);
+        occ.estimated = false; // the real bill amount has been entered
+      }
       occ.override = o;
     }
     if (occ.date >= from && occ.date <= to) out.push(occ);
   };
   for (const r of scheduleItems(state)) {
     if (r.active === false) continue;
+    // Usage-based bills plan on the average of their last few real payments.
+    const amount = r.variable ? estimateAmount(r, state.transactions, { outgoing: r.direction !== 'in' }) : Math.abs(r.amount);
     for (const date of occurrencesBetween(r, lo, hi, holidays)) {
       emit({
         key: `${r.id}:${date}`,
@@ -49,15 +54,17 @@ export function buildOccurrences(state, from, to) {
         type: r.direction === 'in' ? (r.kind === 'salary' ? 'payday' : 'income') : KIND_TO_TYPE[r.kind] || 'bill',
         date,
         name: r.name,
-        amount: r.direction === 'in' ? Math.abs(r.amount) : -Math.abs(r.amount),
+        amount: r.direction === 'in' ? amount : -amount,
         categoryId: r.categoryId,
         compulsory: r.direction === 'out' && !!r.compulsory,
         match: r.match,
+        ...(r.variable ? { variable: true, estimated: true } : {}),
       });
     }
   }
   for (const d of state.debts || []) {
-    if (!(d.balance > 0) || !(d.minPayment > 0) || !d.dueDay) continue;
+    const pay = debtPayment(d, state.transactions);
+    if (!pay || !d.dueDay) continue;
     const item = { frequency: 'monthly', dayOfMonth: d.dueDay, startDate: d.startDate || '2000-01-01', adjust: 'none' };
     for (const date of occurrencesBetween(item, lo, hi, holidays)) {
       emit({
@@ -67,14 +74,34 @@ export function buildOccurrences(state, from, to) {
         type: 'debt',
         date,
         name: d.name,
-        amount: -Math.abs(d.minPayment),
+        amount: -pay.amount,
         categoryId: 'debt',
         compulsory: true,
         match: d.match || d.lender || d.name,
+        ...(pay.variable ? { variable: true, estimated: true } : {}),
+        ...(d.statementDay ? { statementDay: d.statementDay } : {}),
       });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.amount - b.amount);
+}
+
+/**
+ * What a debt's monthly payment is expected to be, from how you pay it:
+ *  - minimum (default): the minimum payment, while there's a balance
+ *  - fixed: a set amount each month
+ *  - full: the whole statement balance. It changes every month, so it's estimated from your last
+ *    few card payments (or the balance) until you enter the statement amount.
+ */
+export function debtPayment(d, transactions = []) {
+  const mode = d.payMode || 'minimum';
+  if (mode === 'full') {
+    const amount = estimateAmount({ ...d, match: d.match || d.lender || d.name, amount: d.balance || d.minPayment || 0 }, transactions);
+    return { amount, variable: true };
+  }
+  if (!(d.balance > 0)) return null;
+  if (mode === 'fixed' && d.fixedPayment > 0) return { amount: Math.abs(d.fixedPayment), variable: false };
+  return d.minPayment > 0 ? { amount: Math.abs(d.minPayment), variable: false } : null;
 }
 
 /** Net spend per category per month: { 'YYYY-MM': { catId: amount } } (positive = money out). */
@@ -167,7 +194,8 @@ export function monthSummary(state, year, month, today) {
   const isCurrent = today >= from && today <= to;
   let safePerDay = null;
   let safeBasis = null;
-  const balances = (state.accounts || []).filter((a) => typeof a.balance === 'number');
+  // Spendable money only: credit cards / Flex balances are debts, not cash.
+  const balances = (state.accounts || []).filter((a) => typeof a.balance === 'number' && a.kind !== 'credit');
   if (isCurrent) {
     if (balances.length && nextPayday) {
       // Live bank balance: what's in the account minus bills due before the next payday.

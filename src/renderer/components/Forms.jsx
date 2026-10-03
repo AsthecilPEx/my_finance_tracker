@@ -136,7 +136,7 @@ export function RecurringForm({ initial, onDone }) {
     const startDate = (byDay || f.frequency === 'last-working-day') && f.startDate > monthStart ? monthStart : f.startDate;
     await dispatch({
       type: 'recurring/save',
-      payload: { ...f, startDate, currency: f.currency && f.currency !== state.settings.currency ? f.currency : undefined, amount: parseFloat(f.amount), dayOfMonth: parseInt(f.dayOfMonth, 10) || 1, endDate: f.endDate || null, match: (f.match || f.name).toLowerCase(), compulsory: !isIn && f.compulsory },
+      payload: { ...f, variable: !isIn && !!f.variable, startDate, currency: f.currency && f.currency !== state.settings.currency ? f.currency : undefined, amount: parseFloat(f.amount), dayOfMonth: parseInt(f.dayOfMonth, 10) || 1, endDate: f.endDate || null, match: (f.match || f.name).toLowerCase(), compulsory: !isIn && f.compulsory },
     });
     notify('Saved', 'good');
     onDone();
@@ -150,8 +150,14 @@ export function RecurringForm({ initial, onDone }) {
       </div>
       <div className="row2">
         <Field label="Name"><input required value={f.name} onChange={set('name')} placeholder={isIn ? 'Salary' : 'e.g. Council Tax'} /></Field>
-        <Field label="Amount"><AmountInput value={f.amount} onChange={set('amount')} currency={f.currency} onCurrency={set('currency')} required /><ConvertedHint amount={f.amount} currency={f.currency} /></Field>
+        <Field label={f.variable ? 'Typical amount' : 'Amount'}><AmountInput value={f.amount} onChange={set('amount')} currency={f.currency} onCurrency={set('currency')} required /><ConvertedHint amount={f.amount} currency={f.currency} /></Field>
       </div>
+      {!isIn && (
+        <label className="check">
+          <input type="checkbox" checked={!!f.variable} onChange={set('variable')} />
+          <span><b>Amount changes each time</b> (energy, water, phone usage, card statements). Pulse plans with the average of your last 3 payments, ticks it off whatever the amount, and reminds you to enter the real bill when it's due.</span>
+        </label>
+      )}
       <div className="row2">
         <Field label="Type">
           <select value={f.kind} onChange={set('kind')}>
@@ -201,13 +207,25 @@ export function RecurringForm({ initial, onDone }) {
 
 export function DebtForm({ initial, onDone }) {
   const { state, dispatch, notify } = useApp();
-  const [f, setF] = useState(() => ({ name: '', type: 'credit-card', lender: '', balance: '', apr: '', minPayment: '', dueDay: 1, currency: state.settings.currency, ...initial }));
+  const [f, setF] = useState(() => ({ name: '', type: 'credit-card', lender: '', balance: '', apr: '', minPayment: '', dueDay: 1, payMode: 'minimum', fixedPayment: '', statementDay: '', currency: state.settings.currency, ...initial }));
+  const isCard = f.type === 'credit-card' || f.type === 'bnpl' || f.type === 'overdraft';
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v?.target ? v.target.value : v }));
   const submit = async (e) => {
     e.preventDefault();
     await dispatch({
       type: 'debt/save',
-      payload: { ...f, currency: f.currency && f.currency !== state.settings.currency ? f.currency : undefined, balance: parseFloat(f.balance), apr: parseFloat(f.apr) || 0, minPayment: parseFloat(f.minPayment) || 0, dueDay: parseInt(f.dueDay, 10) || 1, match: (f.lender || f.name).toLowerCase() },
+      payload: {
+        ...f,
+        currency: f.currency && f.currency !== state.settings.currency ? f.currency : undefined,
+        balance: parseFloat(f.balance),
+        apr: parseFloat(f.apr) || 0,
+        minPayment: parseFloat(f.minPayment) || 0,
+        dueDay: parseInt(f.dueDay, 10) || 1,
+        payMode: isCard ? f.payMode || 'minimum' : 'minimum',
+        fixedPayment: isCard && f.payMode === 'fixed' ? parseFloat(f.fixedPayment) || 0 : undefined,
+        statementDay: isCard ? parseInt(f.statementDay, 10) || undefined : undefined,
+        match: (f.lender || f.name).toLowerCase(),
+      },
     });
     notify('Debt saved', 'good');
     onDone();
@@ -228,6 +246,25 @@ export function DebtForm({ initial, onDone }) {
         <Field label={`Monthly payment (EMI)${f.currency && f.currency !== state.settings.currency ? ` in ${f.currency}` : ''}`}><input type="number" step="0.01" min="0" value={f.minPayment} onChange={set('minPayment')} /><ConvertedHint amount={f.minPayment} currency={f.currency} /></Field>
         <Field label="Due day of month"><input type="number" min="1" max="31" value={f.dueDay} onChange={set('dueDay')} /></Field>
       </div>
+      {isCard && (
+        <>
+          <div className="row2">
+            <Field label="How you pay it each month">
+              <select value={f.payMode} onChange={set('payMode')}>
+                <option value="minimum">The minimum payment</option>
+                <option value="full">The full statement balance</option>
+                <option value="fixed">A fixed amount</option>
+              </select>
+            </Field>
+            {f.payMode === 'fixed' ? (
+              <Field label="Fixed amount each month"><input type="number" step="0.01" min="0" required value={f.fixedPayment} onChange={set('fixedPayment')} /></Field>
+            ) : (
+              <Field label="Statement day (optional)" hint="When your monthly statement is issued."><input type="number" min="1" max="31" value={f.statementDay} onChange={set('statementDay')} placeholder="e.g. 28" /></Field>
+            )}
+          </div>
+          {f.payMode === 'full' && <p className="muted sm">The statement balance changes every month. Pulse estimates it from your recent card payments and, from your statement day, asks you for the real amount.</p>}
+        </>
+      )}
       <Field label="Lender / statement keyword" hint="Payments containing this text are matched automatically."><input value={f.lender} onChange={set('lender')} placeholder="e.g. Barclaycard" /></Field>
       <div className="form-actions">
         <button type="button" className="btn ghost" onClick={onDone}>Cancel</button>
