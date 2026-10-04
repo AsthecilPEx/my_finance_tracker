@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createEmptyState, reduce } from '../src/engine/state.js';
-import { statementFor, cardBill, cardOutstanding, unclassifiedAccounts } from '../src/engine/cards.js';
+import { statementFor, cardBill, cardOutstanding, unclassifiedAccounts, purchasesAwaitingPlan, planApr, emiStatus } from '../src/engine/cards.js';
 import { buildOccurrences } from '../src/engine/summary.js';
 
 const r = (date, amount, description) => ({ date, amount, description, account: 'Monzo Flex' });
@@ -55,12 +55,47 @@ describe('Flex-style cards (every purchase split into monthly payments)', () => 
   it('a normal card is unchanged by the spread option being off', () => {
     const s = flex(ROWS, { spread: null });
     expect(statementFor(s, card(s), '2026-09-27')).toMatchObject({ purchases: 150, spread: 0, total: 150 });
-    expect(card(s).spread).toBe(null);
+    expect(card(s).plan).toEqual({ mode: 'full' });
   });
 
   it('suggests Flex presets in the new-account question', () => {
     let s = createEmptyState();
     s = reduce(s, { type: 'txn/import', payload: { source: 'monzo', rows: ROWS } });
     expect(unclassifiedAccounts(s)[0]).toMatchObject({ account: 'Monzo Flex', likelyCard: true, flex: true });
+  });
+
+  describe('Monzo Flex default payment options', () => {
+    const FLEX = { mode: 'full', freeMonths: 3, apr: 39, maxMonths: 24, minInstalment: 5 };
+
+    it('"Pay in full on 10th": every purchase on the next bill, 0% interest', () => {
+      const s = flex(ROWS, { spread: null, plan: { ...FLEX, mode: 'full' } });
+      expect(statementFor(s, card(s), '2026-09-27').total).toBe(150);
+      expect(cardBill(s, card(s), '2026-09-27').due).toBe('2026-10-10');
+    });
+
+    it('"Choose for every purchase": asks about each new purchase, plans use the right rate', () => {
+      let s = flex(ROWS, { spread: null, plan: { ...FLEX, mode: 'choose' } });
+      const waiting = purchasesAwaitingPlan(s, '2026-10-04').map((x) => x.txn.description);
+      expect(waiting).toEqual(['PRET', 'IKEA']);
+      expect(statementFor(s, card(s), '2026-09-27').total).toBe(150); // in full until chosen
+      expect(planApr(card(s), 3)).toBe(0);
+      expect(planApr(card(s), 6)).toBe(39);
+      const ikea = s.transactions.find((t) => t.description === 'IKEA');
+      s = reduce(s, { type: 'emi/save', payload: { txnId: ikea.id, tenure: 6, apr: planApr(card(s), 6), firstClose: '2026-09-27' } });
+      expect(purchasesAwaitingPlan(s, '2026-10-04').map((x) => x.txn.description)).toEqual(['PRET']);
+      const plan = s.debts.find((d) => d.type === 'card-emi');
+      expect(plan).toMatchObject({ tenure: 6, apr: 39 });
+      expect(statementFor(s, card(s), '2026-09-27').total).toBe(emiStatus(plan, card(s), '2026-09-30').rows[0].amount);
+    });
+
+    it('"Minimum monthly payment": up to 24 months at 39%, fewer for small purchases', () => {
+      const s = flex([r('2026-09-15', -600, 'SOFA'), r('2026-09-16', -40, 'SHOES'), r('2026-09-17', -4, 'COFFEE')], { spread: null, plan: { ...FLEX, mode: 'minimum' } });
+      const lines = statementFor(s, card(s), '2026-09-27').lines;
+      const by = Object.fromEntries(lines.map((l) => [l.description, l]));
+      expect(by.SOFA.n).toBe(24);
+      expect(by.SHOES.n).toBe(8); // £40 at a £5 minimum
+      expect(by.COFFEE).toMatchObject({ kind: 'purchase', amount: 4 }); // too small to split
+      expect(by.SOFA.amount).toBeCloseTo(600 * (0.39 / 12) / (1 - (1 + 0.39 / 12) ** -24), 1);
+    });
   });
 });

@@ -10,6 +10,7 @@ import { round2, formatMoney } from './money.js';
 import { buildOccurrences } from './summary.js';
 import { matchOccurrences } from './recurring.js';
 import { financialView } from './view.js';
+import { purchasesAwaitingPlan } from './cards.js';
 
 /** The statement date that comes before a card payment due on `due` (monthly cycle). */
 export function statementDateBefore(due, statementDay) {
@@ -96,6 +97,14 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     items.push({ key, kind: 'bill-amount', icon: card ? '💳' : '🧾', occKey: o.key, amount: -o.amount, date: o.date, estimate: -o.amount,
       title: card ? `${o.name} statement: how much is due?` : `${o.name}: what's this bill?`,
       detail: `Due ${o.date} · planning ≈ ${formatMoney(-o.amount, state.settings?.currency || 'GBP')}` });
+  }
+
+  // 6) "Choose for every purchase" cards: how is this one being paid?
+  for (const { card, txn } of purchasesAwaitingPlan(state, today)) {
+    const key = `plan:${txn.id}`;
+    if (dismissed.has(key)) continue;
+    items.push({ key, kind: 'card-plan', icon: '💳', txnIds: [txn.id], cardId: card.id, amount: -txn.amount, date: txn.date,
+      title: `How are you paying for ${txn.description}?`, detail: `${card.name} · ${txn.date}` });
   }
 
   items.sort((a, b) => b.date.localeCompare(a.date));

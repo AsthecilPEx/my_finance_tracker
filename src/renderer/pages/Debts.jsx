@@ -68,36 +68,36 @@ export default function Debts() {
                     <div><h3>{c.name}</h3><span className="muted sm">Statement on the {ordinal(c.statementDay)} · due the {ordinal(c.dueDay)} · {c.payMode === 'minimum' ? 'pays the minimum' : c.payMode === 'fixed' ? `pays ${fmt(c.fixedPayment)}` : 'paid in full'}</span></div>
                     <div className="row-actions"><button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setEditCard(raw)}>✎</button></div>
                   </div>
-                  <div className="debt-bal">{fmt(c.balance, { decimals: 0 })}<small className="muted"> owed</small></div>
+                  {(() => { const onPlans = emis.reduce((t, e) => t + (e.emi?.remaining || 0), 0); return (
+                    <div className="debt-bal">{fmt(c.balance + onPlans, { decimals: 0 })}<small className="muted"> owed{onPlans > 0 ? ` · ${fmt(onPlans, { decimals: 0 })} on plans` : ''}</small></div>
+                  ); })()}
                   {used !== null && <div className="progress" aria-label={`${Math.round(used * 100)}% of limit used`}><span style={{ width: `${used * 100}%` }} /></div>}
                   <div className="debt-meta">
                     {used !== null && <span>{Math.round(used * 100)}% of {fmt(c.creditLimit, { decimals: 0 })} limit</span>}
                     {c.apr > 0 && <span className={c.apr >= 15 ? 'neg' : ''}>{c.apr}% APR</span>}
                   </div>
                   {c.nextBill && <CardBill card={c} bill={c.nextBill} soFar={soFar} openClose={openClose} />}
-                  {emis.length > 0 && <div className="muted sm">EMI plans on this card: {emis.map((e) => e.name).join(', ')}</div>}
-                </div>
-              );
-            })}
-            {view.debts.filter((d) => isCardEmi(d) && d.tenure > 1).map((e) => {
-              const st = e.emi;
-              const card = view.debts.find((d) => d.id === e.viaCard);
-              const txn = state.transactions.find((t) => t.id === e.txnId);
-              const raw = state.debts.find((x) => x.id === e.id);
-              return (
-                <div key={e.id} className={`card debt ${st.done ? 'inactive' : ''}`}>
-                  <div className="card-head">
-                    <div><h3>{e.name}</h3><span className="muted sm">EMI on {card?.name} · {st.tenure} months{e.apr ? ` at ${e.apr}%` : ' · interest-free'}</span></div>
-                    <div className="row-actions">{txn && <button className="icon-btn" aria-label={`Edit ${e.name}`} onClick={() => setEditEmi({ txn, plan: raw })}>✎</button>}</div>
-                  </div>
-                  <div className="debt-bal">{fmt(st.remaining, { decimals: 0 })}<small className="muted"> left</small></div>
-                  <div className="progress" aria-label={`${st.billed} of ${st.tenure} instalments`}><span style={{ width: `${(st.billed / st.tenure) * 100}%` }} /></div>
-                  <div className="debt-meta">
-                    <span>{st.billed} of {st.tenure} paid</span>
-                    <span>{fmt(st.instalment)}/mo on the card bill</span>
-                    {st.totalInterest > 0 && <span className="neg">{fmt(st.totalInterest)} interest</span>}
-                  </div>
-                  <div className="muted sm">{st.done ? 'Finished' : st.next ? `Next instalment on the ${st.next.date} statement` : ''}</div>
+                  {emis.length > 0 && (
+                    <div className="card-plans">
+                      <div className="muted sm">Plans on this card</div>
+                      <ul className="list compact">
+                        {emis.map((e) => {
+                          const st = e.emi;
+                          const txn = state.transactions.find((t) => t.id === e.txnId);
+                          return (
+                            <li key={e.id} className="list-row">
+                              <span className="grow"><b>{e.name}</b><small className="muted"> · {st.billed}/{st.tenure} paid{e.apr ? ` · ${e.apr}%` : ' · 0%'}</small>
+                                <div className="progress thin"><span style={{ width: `${(st.billed / st.tenure) * 100}%` }} /></div>
+                              </span>
+                              <span className="muted sm nowrap">{fmt(st.instalment)}/mo</span>
+                              <b className="nowrap">{fmt(st.remaining, { decimals: 0 })} left</b>
+                              {txn && <button className="icon-btn" aria-label={`Edit ${e.name}`} onClick={() => setEditEmi({ txn, plan: state.debts.find((x) => x.id === e.id) })}>✎</button>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -200,8 +200,8 @@ function CardBill({ card, bill, soFar, openClose }) {
         </div>
         <div>
           <span className="muted sm">This cycle so far</span>
-          <b>{fmt(soFar.purchases + soFar.spread - soFar.refunds)}</b>
-          <small className="muted">closes {openClose}{soFar.emi ? ` · + ${fmt(soFar.emi)} EMI` : ''}</small>
+          <b>{fmt(soFar.total)}</b>
+          <small className="muted">closes {openClose}{soFar.emi ? ` · incl. ${fmt(soFar.emi)} plan payments` : ''}</small>
         </div>
       </div>
       {bill.historyGap && !bill.entered && (

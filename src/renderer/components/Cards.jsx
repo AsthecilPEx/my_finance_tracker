@@ -2,8 +2,17 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../store.jsx';
 import Modal from './Modal.jsx';
 import { Field } from './Forms.jsx';
-import { unclassifiedAccounts, cardDebts, closeOnOrBefore, nextClose, emiSchedule, instalmentFor, isCardDebt } from '../../engine/cards.js';
+import { unclassifiedAccounts, cardDebts, closeOnOrBefore, nextClose, emiSchedule, instalmentFor, isCardDebt, planOf, planApr } from '../../engine/cards.js';
 import { ordinal, todayISO } from '../../engine/dates.js';
+
+// Monzo Flex's options; you pick the one your app is set to.
+const FLEX_PLAN = { mode: 'full', freeMonths: 3, apr: 39, maxMonths: 24, minInstalment: 5 };
+const PLAN_MODES = [
+  { id: 'full', title: 'Each purchase in full on the next bill', sub: 'Normal credit cards · Flex "Pay in full"' },
+  { id: 'choose', title: 'I choose for every purchase', sub: 'In full or 3, 6, 12 or 24 months · Flex "Choose for every purchase"' },
+  { id: 'minimum', title: 'Minimum monthly payment', sub: 'Every purchase over up to 24 months · Flex "Minimum monthly payment"' },
+  { id: 'split', title: 'Same split for every purchase', sub: 'e.g. always 3 months' },
+];
 
 const SOURCE_LABEL = { csv: 'a statement file', watch: 'your watched folder', bank: 'bank sync', monzo: 'Monzo', truelayer: 'bank sync' };
 
@@ -39,7 +48,7 @@ export function NewAccountPrompt() {
         <div className="form-actions">
           <button type="button" className="btn ghost" onClick={() => setLater((l) => [...l, a.account])}>Ask me later</button>
           <button type="button" className="btn ghost" onClick={() => { dispatch({ type: 'account/classify', payload: { account: a.account, kind: 'bank' } }); notify(`${a.account} saved as a bank account`, 'good'); }}>No, it's a bank account</button>
-          <button type="button" className={`btn ${a.likelyCard ? 'primary' : 'ghost'}`} onClick={() => setSetup({ cardAccount: a.account, name: a.account, flipSign: a.looksFlipped, suggestedFlip: a.looksFlipped, ...(a.flex ? { spread: { months: 3, apr: 0 }, match: 'monzo flex' } : {}) })}>Yes, it's a credit card</button>
+          <button type="button" className={`btn ${a.likelyCard ? 'primary' : 'ghost'}`} onClick={() => setSetup({ cardAccount: a.account, name: a.account, flipSign: a.looksFlipped, suggestedFlip: a.looksFlipped, ...(a.flex ? { plan: { ...FLEX_PLAN }, match: 'monzo flex' } : {}) })}>Yes, it's a credit card</button>
         </div>
       </div>
     </Modal>
@@ -51,7 +60,7 @@ export function CardForm({ initial, onDone }) {
   const { state, dispatch, notify, fmt } = useApp();
   const [f, setF] = useState(() => ({
     name: '', statementDay: '', dueDay: '', payMode: 'full', minPct: 3, minFloor: 25, fixedPayment: '', apr: '', creditLimit: '', match: '',
-    flipSign: false, openBalance: initial?.balanceAsOf?.amount ?? '', openDate: initial?.balanceAsOf?.date || todayISO(), ...initial,
+    flipSign: false, plan: initial?.plan?.mode ? initial.plan : planOf(initial || {}), openBalance: initial?.balanceAsOf?.amount ?? '', openDate: initial?.balanceAsOf?.date || todayISO(), ...initial,
   }));
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v?.target ? (v.target.type === 'checkbox' ? v.target.checked : v.target.value) : v }));
   const submit = async (e) => {
@@ -104,16 +113,7 @@ export function CardForm({ initial, onDone }) {
         <Field label="Balance owed now (optional)" hint="Leave blank to use your statements."><input type="number" step="0.01" min="0" value={f.openBalance} onChange={set('openBalance')} /></Field>
         <Field label="As of"><input type="date" value={f.openDate} onChange={set('openDate')} /></Field>
       </div>
-      <label className="check">
-        <input type="checkbox" checked={!!f.spread} onChange={(e) => setF((x) => ({ ...x, spread: e.target.checked ? { months: 3, apr: 0 } : null }))} />
-        <span><b>Purchases are split into monthly payments</b> (like Monzo Flex)</span>
-      </label>
-      {f.spread && (
-        <div className="row2">
-          <Field label="Split each purchase over (months)"><input type="number" min="2" max="24" value={f.spread.months} onChange={(e) => setF((x) => ({ ...x, spread: { ...x.spread, months: e.target.value } }))} /></Field>
-          <Field label="Interest on the split (APR %)" hint="0 for Flex's interest-free 3 months."><input type="number" step="0.01" min="0" value={f.spread.apr} onChange={(e) => setF((x) => ({ ...x, spread: { ...x.spread, apr: e.target.value } }))} /></Field>
-        </div>
-      )}
+      <PlanPicker value={f.plan} onChange={(plan) => setF((x) => ({ ...x, plan }))} />
       <label className="check">
         <input type="checkbox" checked={!!f.flipSign} onChange={set('flipSign')} />
         <span><b>Purchases show as positive numbers</b> in this card's file{f.suggestedFlip ? ' (Pulse spotted this)' : ''}</span>
@@ -141,7 +141,7 @@ export function EmiForm({ txn, plan, onDone }) {
   const [f, setF] = useState(() => ({
     name: plan?.name || `${txn.description} EMI`,
     principal: plan?.principal ?? Math.abs(txn.amount),
-    tenure: plan?.tenure ?? (card?.spread ? card.spread.months : 6),
+    tenure: plan?.tenure ?? 6,
     apr: plan?.apr ?? 0,
     fee: plan?.fee ?? 0,
     firstClose: plan?.firstClose || first,
@@ -165,12 +165,10 @@ export function EmiForm({ txn, plan, onDone }) {
   return (
     <form onSubmit={submit} className="form">
       <p className="muted">{txn.description} on {txn.date} with {card.name}: <b>{fmt(Math.abs(txn.amount))}</b></p>
-      {card.spread && (
-        <div className="callout">
-          <p>{card.name} splits purchases over {card.spread.months} months. Did this one differ in your card's app? Set it here.</p>
-          <button type="button" className="btn ghost sm" onClick={payInFull}>Pay this one in full on the next bill</button>
-        </div>
-      )}
+      <div className="callout">
+        <p className="sm">Quick choice{planOf(card).mode !== 'full' ? ` (as on your ${card.name} app)` : ''}:</p>
+        <PlanChips card={card} txn={txn} current={plan} onDone={onDone} />
+      </div>
       <div className="row2">
         <Field label="Plan name"><input required value={f.name} onChange={set('name')} /></Field>
         <Field label="Amount converted to EMI"><input type="number" step="0.01" min="1" max={Math.abs(txn.amount)} required value={f.principal} onChange={set('principal')} /></Field>
@@ -240,5 +238,63 @@ export function AccountsList() {
       </ul>
       {edit && <Modal title={isCardDebt(edit) ? `Edit ${edit.name}` : `Set up ${edit.cardAccount} as a credit card`} onClose={() => setEdit(null)}><CardForm initial={edit} onDone={() => setEdit(null)} /></Modal>}
     </>
+  );
+}
+
+/** "How purchases are paid": the same choices as Monzo Flex's default payment option. */
+function PlanPicker({ value, onChange }) {
+  const p = { ...FLEX_PLAN, months: 3, ...(value || {}) };
+  const set = (k) => (e) => onChange({ ...p, [k]: e.target.value });
+  return (
+    <fieldset className="plan-picker">
+      <legend>How purchases are paid</legend>
+      {PLAN_MODES.map((m) => (
+        <label key={m.id} className={`plan-opt ${p.mode === m.id ? 'on' : ''}`}>
+          <input type="radio" name="plan-mode" checked={p.mode === m.id} onChange={() => onChange({ ...p, mode: m.id })} />
+          <span><b>{m.title}</b><small className="muted">{m.sub}</small></span>
+        </label>
+      ))}
+      {p.mode === 'split' && (
+        <div className="row2">
+          <Field label="Months per purchase"><input type="number" min="2" max="36" value={p.months} onChange={set('months')} /></Field>
+          <Field label="Interest (APR %)"><input type="number" step="0.01" min="0" value={p.apr} onChange={set('apr')} /></Field>
+        </div>
+      )}
+      {(p.mode === 'choose' || p.mode === 'minimum') && (
+        <div className="row2">
+          <Field label="Interest-free up to (months)" hint="Flex: 3"><input type="number" min="0" max="24" value={p.freeMonths} onChange={set('freeMonths')} /></Field>
+          <Field label="Interest on longer plans (APR %)" hint="Your Flex rate"><input type="number" step="0.01" min="0" value={p.apr} onChange={set('apr')} /></Field>
+        </div>
+      )}
+      {p.mode === 'minimum' && (
+        <div className="row2">
+          <Field label="Longest plan (months)"><input type="number" min="2" max="36" value={p.maxMonths} onChange={set('maxMonths')} /></Field>
+          <Field label="Smallest monthly payment" hint="Small purchases get fewer months"><input type="number" step="0.5" min="0" value={p.minInstalment} onChange={set('minInstalment')} /></Field>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** Quick plan buttons for a card purchase: in full, or one of the card's plan lengths. */
+export function PlanChips({ card, txn, current, onDone }) {
+  const { dispatch, notify, fmt } = useApp();
+  const pl = planOf(card);
+  const first = closeOnOrBefore(card, txn.date) === txn.date ? txn.date : nextClose(card, closeOnOrBefore(card, txn.date));
+  const choose = async (months) => {
+    const apr = planApr(card, months);
+    await dispatch({ type: 'emi/save', payload: { id: current?.id, txnId: txn.id, name: months === 1 ? `${txn.description} (paid in full)` : `${txn.description} · ${months} months`, principal: Math.abs(txn.amount), tenure: months, apr, fee: 0, firstClose: first } });
+    notify(months === 1 ? `${txn.description}: in full on the next bill` : `${txn.description}: ${fmt(instalmentFor(Math.abs(txn.amount), apr, months))}/mo for ${months} months${apr ? ` at ${apr}%` : ', interest-free'}`, 'good');
+    onDone?.();
+  };
+  return (
+    <div className="inline-row wrap plan-chips">
+      <button type="button" className={`btn sm ${current?.tenure === 1 ? 'primary' : 'ghost'}`} onClick={() => choose(1)}>In full</button>
+      {pl.options.map((m) => (
+        <button key={m} type="button" className={`btn sm ${current?.tenure === m ? 'primary' : 'ghost'}`} onClick={() => choose(m)} title={planApr(card, m) ? `${planApr(card, m)}% APR` : 'Interest-free'}>
+          {m} mo{planApr(card, m) ? '' : ' · 0%'}
+        </button>
+      ))}
+    </div>
   );
 }

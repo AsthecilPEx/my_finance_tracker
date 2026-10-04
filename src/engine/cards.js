@@ -150,14 +150,58 @@ export function closeOnOrAfter(card, date) {
   return c === date ? c : nextClose(card, c);
 }
 
-/** Cards like Monzo Flex split every purchase into monthly payments (e.g. 3 months at 0%). */
-export const spreadOf = (card) => (card?.spread && Number(card.spread.months) > 1 ? { months: Math.round(Number(card.spread.months)), apr: Number(card.spread.apr) || 0 } : null);
+/**
+ * How a card turns purchases into bill lines (Monzo Flex's "default payment option", which
+ * any card can use):
+ *   full     every purchase in full on the next bill (normal credit cards; Flex "Pay in full")
+ *   choose   you pick per purchase: in full or 3/6/12/24 months (Flex "Choose for every purchase").
+ *            Until you choose, a purchase is billed in full.
+ *   split    every purchase over the same number of months
+ *   minimum  every purchase over up to `maxMonths` at the card's rate; small purchases get fewer
+ *            months so each payment is at least `minInstalment` (Flex "Minimum monthly payment")
+ * Plans up to `freeMonths` long are interest-free; longer ones charge `apr`.
+ * Any single purchase can be set differently (an explicit plan via emiId always wins).
+ */
+export const PLAN_OPTIONS = [3, 6, 12, 24];
 
-/** A purchase on a spreading card, as an implicit instalment plan billed from its own cycle. */
-function spreadPlan(card, t) {
-  const sp = spreadOf(card);
-  return { principal: -(t.rawAmount ?? t.amount), apr: sp.apr, tenure: sp.months, fee: 0, firstClose: closeOnOrAfter(card, t.date) };
+export function planOf(card) {
+  if (!card) return { mode: 'full' };
+  if (card.plan?.mode) {
+    const p = card.plan;
+    return {
+      mode: p.mode,
+      months: Math.max(2, Math.round(Number(p.months) || 3)),
+      apr: Number(p.apr) || 0,
+      freeMonths: Math.max(0, Math.round(Number(p.freeMonths ?? 3))),
+      maxMonths: Math.max(2, Math.round(Number(p.maxMonths) || 24)),
+      minInstalment: Math.max(0, Number(p.minInstalment ?? 5)),
+      options: Array.isArray(p.options) && p.options.length ? p.options.map(Number) : PLAN_OPTIONS,
+    };
+  }
+  // Older 0.5.1 setting: { spread: { months, apr } }.
+  if (card.spread && Number(card.spread.months) > 1) return { mode: 'split', months: Math.round(Number(card.spread.months)), apr: Number(card.spread.apr) || 0, freeMonths: 0, maxMonths: 24, minInstalment: 0, options: PLAN_OPTIONS };
+  return { mode: 'full', months: 3, apr: 0, freeMonths: 3, maxMonths: 24, minInstalment: 5, options: PLAN_OPTIONS };
 }
+
+/** The interest rate for a plan of `months` on this card (interest-free up to freeMonths). */
+export function planApr(card, months) {
+  const p = planOf(card);
+  return months <= 1 || months <= p.freeMonths ? 0 : p.apr;
+}
+
+/** The card's automatic plan for a purchase (none means: in full on the next bill). */
+function autoPlan(card, t) {
+  const p = planOf(card);
+  const principal = -(t.rawAmount ?? t.amount);
+  let tenure = 0;
+  if (p.mode === 'split') tenure = p.months;
+  if (p.mode === 'minimum') tenure = Math.max(1, Math.min(p.maxMonths, p.minInstalment > 0 ? Math.floor(principal / p.minInstalment) : p.maxMonths));
+  if (tenure <= 1) return null;
+  return { principal, apr: p.mode === 'split' ? p.apr : planApr(card, tenure), tenure, fee: 0, firstClose: closeOnOrAfter(card, t.date) };
+}
+
+/** Back-compat for the 0.5.1 name. */
+export const spreadOf = (card) => { const p = planOf(card); return p.mode === 'split' ? { months: p.months, apr: p.apr } : null; };
 
 /**
  * The statement for the cycle ending on `close`, with every line that makes it up:
@@ -166,23 +210,26 @@ function spreadPlan(card, t) {
  */
 export function statementFor(state, card, close) {
   const start = addDays(previousClose(card, close), 1);
-  const sp = spreadOf(card);
+  const pl = planOf(card);
+  const spreads = pl.mode === 'split' || pl.mode === 'minimum';
   const lines = [];
   let purchases = 0;
   let refunds = 0;
   let payments = 0;
   let spread = 0;
-  // A spreading card bills purchases from up to `months` cycles back.
+  // A card that spreads purchases bills them from up to `months` cycles back.
   let from = start;
-  if (sp) for (let i = 1; i < sp.months; i++) from = addDays(previousClose(card, addDays(from, -1)), 1);
+  const back = pl.mode === 'split' ? pl.months : pl.mode === 'minimum' ? pl.maxMonths : 1;
+  for (let i = 1; i < back; i++) from = addDays(previousClose(card, addDays(from, -1)), 1);
   for (const t of cardTxns(state, card)) {
     if (t.date < from || t.date > close) continue;
     const amt = t.rawAmount ?? t.amount;
     if (amt < 0) {
       if (t.emiId) continue; // billed through its own EMI plan
-      if (sp) {
-        const r = emiSchedule(spreadPlan(card, t), card).find((x) => x.date === close);
-        if (r) { spread += r.amount; lines.push({ date: t.date, description: t.description, amount: r.amount, kind: 'instalment', k: r.k, n: sp.months, original: round2(-amt) }); }
+      const auto = spreads ? autoPlan(card, t) : null;
+      if (auto) {
+        const r = emiSchedule(auto, card).find((x) => x.date === close);
+        if (r) { spread += r.amount; lines.push({ date: t.date, description: t.description, amount: r.amount, kind: 'instalment', k: r.k, n: auto.tenure, original: round2(-amt) }); }
       } else if (t.date >= start) {
         purchases += -amt;
         lines.push({ date: t.date, description: t.description, amount: round2(-amt), kind: 'purchase' });
@@ -252,7 +299,7 @@ export function cardBill(state, card, close) {
 /** What's owed on the card now (excluding EMI principal not yet billed, which is tracked on its plan). */
 export function cardOutstanding(state, card, today = todayISO()) {
   const txns = cardTxns(state, card);
-  const sp = spreadOf(card);
+  const pl = planOf(card);
   const instalmentsBetween = (from, to) => emiPlans(state, card).reduce((s, p) => s + emiSchedule(p, card).filter((r) => r.date > from && r.date <= to).reduce((a, r) => a + r.amount, 0), 0);
   if (card.balanceAsOf && card.balanceAsOf.date) {
     const { amount, date } = card.balanceAsOf;
@@ -267,13 +314,30 @@ export function cardOutstanding(state, card, today = todayISO()) {
   const paidSince = since.filter(isCardPayment).reduce((s, t) => s + t.amount, 0);
   const refundsSince = since.filter((t) => t.amount > 0 && !isCardPayment(t)).reduce((s, t) => s + t.amount, 0);
   let toBill;
-  if (sp) {
-    toBill = txns.filter((t) => (t.rawAmount ?? t.amount) < 0 && !t.emiId && t.date <= today)
-      .reduce((s, t) => s + emiSchedule(spreadPlan(card, t), card).filter((r) => r.date > close).reduce((a, r) => a + r.amount, 0), 0);
+  if (pl.mode === 'split' || pl.mode === 'minimum') {
+    toBill = txns.filter((t) => (t.rawAmount ?? t.amount) < 0 && !t.emiId && t.date <= today).reduce((s, t) => {
+      const auto = autoPlan(card, t);
+      if (!auto) return t.date > close ? s - (t.rawAmount ?? t.amount) : s;
+      return s + emiSchedule(auto, card).filter((r) => r.date > close).reduce((a, r) => a + r.amount, 0);
+    }, 0);
   } else {
     toBill = since.filter((t) => (t.rawAmount ?? t.amount) < 0 && !t.emiId).reduce((s, t) => s - (t.rawAmount ?? t.amount), 0);
   }
   return round2(Math.max(0, last.total - paidSince) + Math.max(0, toBill - refundsSince) + instalmentsBetween(close, today));
+}
+
+/** "Choose for every purchase" cards: recent purchases still waiting for a choice. */
+export function purchasesAwaitingPlan(state, today = todayISO()) {
+  const out = [];
+  for (const card of cardDebts(state)) {
+    if (planOf(card).mode !== 'choose') continue;
+    const since = addDays(closeOnOrBefore(card, today), -35);
+    for (const t of cardTxns(state, card)) {
+      if ((t.rawAmount ?? t.amount) >= 0 || t.emiId || t.date < since || t.categoryId === 'transfer') continue;
+      out.push({ card, txn: t });
+    }
+  }
+  return out.sort((a, b) => b.txn.date.localeCompare(a.txn.date));
 }
 
 // ---------------- imports ----------------
