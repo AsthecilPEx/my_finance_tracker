@@ -102,7 +102,7 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
   const claimed = new Set();
   const crossSourceMatch = (row) => {
     const candidates = byAmount.get(round2(row.amount).toFixed(2)) || [];
-    const hit = candidates.find((t) => !claimed.has(t.id) && Math.abs(daysBetween(t.date, row.date)) <= 1);
+    const hit = candidates.find((t) => !claimed.has(t.id) && Math.abs(daysBetween(t.date, row.date)) <= 1 && !otherBank(t.account, row.account));
     if (hit) claimed.add(hit.id);
     return hit;
   };
@@ -129,7 +129,17 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
     const n = (seen.get(base) || 0) + 1;
     seen.set(base, n);
     const key = `${base}#${n}`;
-    if (existing.has(key) || crossSourceMatch(row)) { duplicates++; continue; }
+    if (existing.has(key)) { duplicates++; continue; }
+    const hit = crossSourceMatch(row);
+    if (hit) {
+      // The bank's own copy of something already here (e.g. a purchase you added by hand to
+      // itemise it): keep your entry, but it now belongs to the bank's account.
+      if (row.externalId && !hit.externalId) {
+        updates.set(hit.id, { ...updates.get(hit.id), externalId: row.externalId, ...(row.account ? { account: row.account } : {}), pending: !!row.pending });
+      }
+      duplicates++;
+      continue;
+    }
     added.push({
       id: newId(),
       date: row.date,
@@ -146,7 +156,7 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
     });
   }
   const patched = updates.size
-    ? state.transactions.map((t) => (updates.has(t.id) ? (({ pending, ...rest }) => { const u = updates.get(t.id); return { ...rest, amount: u.amount, date: u.date, ...(u.pending ? { pending: true } : {}) }; })(t) : t))
+    ? state.transactions.map((t) => (updates.has(t.id) ? (({ pending, ...rest }) => { const { pending: p, ...u } = updates.get(t.id); return { ...rest, ...u, ...(p ? { pending: true } : {}) }; })(t) : t))
     : state.transactions;
   const transactions = [...patched, ...added].sort((a, b) => b.date.localeCompare(a.date));
   const now = new Date().toISOString();
@@ -163,6 +173,11 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
   }
   return { state: { ...state, transactions, imports, bankImports }, added: added.length, duplicates };
 }
+
+const bankWord = (name) => String(name || '').trim().split(/\s+/)[0].toLowerCase();
+const BANKS = new Set(['lloyds', 'hsbc', 'barclays', 'barclaycard', 'revolut', 'monzo', 'starling', 'nationwide', 'natwest', 'santander', 'halifax', 'amex', 'american', 'tsb', 'chase', 'first', 'virgin', 'metro', 'co-op', 'tesco']);
+/** Two accounts clearly at different banks (e.g. "Lloyds Current" and "Monzo Flex"): never the same payment. */
+const otherBank = (a, b) => BANKS.has(bankWord(a)) && BANKS.has(bankWord(b)) && bankWord(a) !== bankWord(b);
 
 /** A row in another currency: store the base-currency amount at today's rate and keep the original. */
 function foreignRow(state, row) {

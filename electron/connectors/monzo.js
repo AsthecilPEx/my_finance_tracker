@@ -214,6 +214,9 @@ export class MonzoConnector {
     const balances = [];
     const recent = addDays(todayISO(), -89);
     let since = m.lastSync ? [addDays(m.lastSync.slice(0, 10), -7), recent].sort()[1] : recent;
+    // Once after 0.5.2: look back 90 days so purchases skipped as duplicates of hand-entered
+    // ones get linked to their Monzo account.
+    if (!m.relinked) since = recent;
     try {
       for (const acc of m.accounts) {
         const pull = async (from) => {
@@ -257,7 +260,7 @@ export class MonzoConnector {
     const before = this.getState().transactions.length;
     await this.dispatch({ type: 'txn/import', payload: { rows, source: 'monzo', fileName: 'Monzo' } });
     await this.dispatch({ type: 'accounts/set', payload: { source: 'monzo', accounts: balances } });
-    await this.update({ lastSync: new Date().toISOString() });
+    await this.update({ lastSync: new Date().toISOString(), relinked: true });
     return { added: this.getState().transactions.length - before };
   }
 

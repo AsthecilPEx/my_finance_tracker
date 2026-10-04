@@ -1,7 +1,7 @@
 {
   "name": "pulse-finance",
   "productName": "Pulse Finance",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A smart personal finance tracker for Windows: category meters, payday calendar, bills, debts, insights and a desktop widget.",
   "author": {
     "name": "Pulse Finance"
