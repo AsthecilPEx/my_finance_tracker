@@ -4,6 +4,7 @@
 // find the smallest starting buffer that keeps it from ever going negative.
 import { addDays, addMonths, daysBetween, parseISO, toISO, monthLabel } from './dates.js';
 import { buildOccurrences, scheduleItems } from './summary.js';
+import { isCardDebt, isCardEmi } from './cards.js';
 import { monthlyEquivalent, occurrencesBetween } from './recurring.js';
 import { profileSummary, paysPerYear } from './income.js';
 import { round2, sum } from './money.js';
@@ -31,7 +32,8 @@ export function payWindow(state, today) {
 export function monthlyCommitments(state) {
   state = financialView(state);
   const bills = sum((state.recurring || []).filter((r) => r.active !== false && r.direction === 'out' && !['savings', 'investment'].includes(r.kind)), (r) => monthlyEquivalent(r.amount, r.frequency));
-  const debts = sum((state.debts || []).filter((d) => d.balance > 0), (d) => d.minPayment || 0);
+  // Tracked cards and their EMI plans are paid from what you spend on the card (already in your allowance).
+  const debts = sum((state.debts || []).filter((d) => d.balance > 0 && !isCardDebt(d) && !isCardEmi(d)), (d) => d.minPayment || 0);
   return round2(bills + debts);
 }
 
@@ -55,7 +57,7 @@ export function payPlan(state, today, count = 8) {
   const billsShare = annualIncome > 0 ? (commitmentsMonthly * 12) / annualIncome : 0;
   const goalsShare = annualIncome > 0 ? (goalsMonthly * 12) / annualIncome : 0;
 
-  const bills = buildOccurrences(state, today, horizon).filter((o) => o.amount < 0 && !['savings'].includes(o.type));
+  const bills = buildOccurrences(state, today, horizon).filter((o) => o.amount < 0 && !o.cardBill && !['savings'].includes(o.type));
   // Steady allowance: spend the same every day no matter when pay lands (income smoothing).
   const spendableMonthly = Math.max(0, annualIncome / 12 - commitmentsMonthly - goalsMonthly);
   const allowancePerDay = round2(spendableMonthly / (365 / 12));

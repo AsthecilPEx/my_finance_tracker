@@ -30,7 +30,9 @@
 | **Any currency, live rates** | Bills, debts and EMIs can be in any currency, e.g. an Indian home loan in ₹. Pulse downloads daily reference rates (ECB via Frankfurter, with ExchangeRate-API as fallback) every time it runs. It re-converts every total, forecast and insight, and tells you when a rate change makes a bill cost more ("your ₹25,000 EMI costs £3.60 more than last month"). |
 | **Needs your attention** | A dedicated dashboard panel for questions only you can answer. Is this a **transfer between your own accounts** (so it isn't counted as money in)? What is this money in: income, a transfer or a split repayment? Which category does this belong to? Has an overdue split been paid? |
 | **Bills that change every time** | Tick **Amount changes each time** for energy, water or phone usage. Pulse plans with the average of your last 3 payments (shown as ≈), ticks the bill off whatever the real amount is, asks you for the real bill under *Needs your attention* when it's due, and flags a bill that comes in well above usual. It also spots these bills in your statements by itself. |
-| **Credit cards, properly** | Say how you pay each card: the **minimum**, the **full statement balance** or a **fixed amount**, plus its statement day. For "pay in full", Pulse estimates the statement from your recent payments and, from your statement day, asks for the real amount. Card balances (and Monzo Flex) are never counted as spendable money. |
+| **Credit cards from their own transactions** | When a statement or bank sync brings in an account Pulse hasn't seen, it asks: **is this a credit card?** Give its statement date, due date and how you pay it (full balance, minimum or a fixed amount), and Pulse works out every bill from the card's transactions: purchases − refunds + EMI instalments. Purchases count as spending when you make them; paying the bill from your bank is a transfer, so nothing counts twice. Card exports that list purchases as positive numbers are spotted and flipped. Change any of it later under **Settings → Your accounts** or on the Debts page. |
+| **Turn a card purchase into EMI** | On any card purchase, **Convert to EMI**: months, interest rate (0% for interest-free), one-off fee and which statement it starts on. Pulse shows the monthly instalment, total interest and last month, takes the purchase out of that month's bill and adds an instalment to each statement instead. The plan gets its own entry on **Debts & Loans** (instalments paid, amount left), and its instalments count as spending in the month they're billed. |
+| **Manual cards and loans** | For cards you'd rather not import, say how you pay (minimum / full / fixed) and the statement day. For "pay in full", Pulse estimates the statement from your recent payments and asks for the real amount from the statement day. Card balances (and Monzo Flex) are never counted as spendable money. |
 | **Pots** | See your bills pot, goal pots and money owed to you in one place, and record moves with one click using the amounts from your payday routine. |
 | **Everything from v1** | Glowing category meters, payday calendar, bills (compulsory vs optional), auto-detected subscriptions, debts with avalanche/snowball planning, insights, desktop widget, tray and reminders. |
 
@@ -74,7 +76,7 @@ On Windows (Node.js 20+):
 npm install
 npm start          # build the UI and launch
 npm run dist       # Windows installer + portable exe in release/
-npm test           # 78 engine, connector, bank-format and security tests
+npm test           # 85 engine, connector, bank-format, card and security tests
 npm run dev        # hot-reload development
 ```
 

@@ -8,6 +8,8 @@ import { ITEMISABLE } from '../../engine/receipts.js';
 import { SplitModal, SettleModal } from '../components/Split.jsx';
 import { myAmount, openSplits } from '../../engine/split.js';
 import { formatMoney } from '../../engine/money.js';
+import { cardDebts, emiStatus } from '../../engine/cards.js';
+import { EmiForm } from '../components/Cards.jsx';
 
 const PAGE = 100;
 
@@ -21,14 +23,19 @@ export default function Transactions({ go }) {
   const [receipt, setReceipt] = useState(null);
   const [splitTxn, setSplitTxn] = useState(null);
   const [settleTxn, setSettleTxn] = useState(null);
+  const [emiTxn, setEmiTxn] = useState(null);
+  const [account, setAccount] = useState('');
+  const cards = useMemo(() => new Map(cardDebts(state).map((c) => [c.cardAccount, c])), [state.debts]);
+  const plans = useMemo(() => new Map((state.debts || []).filter((d) => d.type === 'card-emi').map((d) => [d.id, d])), [state.debts]);
+  const accounts = useMemo(() => [...new Set(state.transactions.map((t) => t.account).filter(Boolean))].sort(), [state.transactions]);
   const hasOpenSplits = useMemo(() => openSplits(state).some((s) => s.outstanding > 0.005), [state]);
   const itemised = useMemo(() => new Map((state.receipts || []).map((r) => [r.txnId, r.items.length])), [state.receipts]);
 
   const months = useMemo(() => [...new Set(state.transactions.map((t) => t.date.slice(0, 7)))].sort().reverse(), [state.transactions]);
   const list = useMemo(() => {
     const needle = q.toLowerCase();
-    return state.transactions.filter((t) => (!cat || t.categoryId === cat) && (!month || t.date.startsWith(month)) && (!needle || t.description.toLowerCase().includes(needle)));
-  }, [state.transactions, q, cat, month]);
+    return state.transactions.filter((t) => (!cat || t.categoryId === cat) && (!account || t.account === account) && (!month || t.date.startsWith(month)) && (!needle || t.description.toLowerCase().includes(needle)));
+  }, [state.transactions, q, cat, month, account]);
   const totalOut = list.filter((t) => t.amount < 0).reduce((s, t) => s - t.amount, 0);
   const totalIn = list.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
 
@@ -52,6 +59,12 @@ export default function Transactions({ go }) {
           <option value="">All categories</option>
           {state.categories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
+        {accounts.length > 1 && (
+          <select value={account} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
+            <option value="">All accounts</option>
+            {accounts.map((a) => <option key={a} value={a}>{cards.has(a) ? '💳 ' : ''}{a}</option>)}
+          </select>
+        )}
         <select value={month} onChange={(e) => setMonth(e.target.value)}>
           <option value="">All months</option>
           {months.map((m) => <option key={m} value={m}>{new Date(m + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</option>)}
@@ -67,7 +80,13 @@ export default function Transactions({ go }) {
                   <td className="muted nowrap">{shortDate(t.date)}</td>
                   <td>
                     <button className="linkish" onClick={() => setEdit(t)}>{t.description}</button>
-                    {t.source !== 'manual' && <span className="src">{t.source === 'bank' ? 'bank' : t.source === 'demo' ? 'demo' : 'csv'}</span>}
+                    {t.source !== 'manual' && <span className="src">{t.source === 'bank' ? 'bank' : t.source === 'demo' ? 'demo' : t.source === 'monzo' ? 'monzo' : 'csv'}</span>}
+                    {cards.has(t.account) && <span className="src card-src" title={`On your ${cards.get(t.account).name} card`}>💳 {cards.get(t.account).name}</span>}
+                    {cards.has(t.account) && t.amount < 0 && t.categoryId !== 'transfer' && (
+                      <button className={`receipt-btn ${t.emiId ? 'done' : ''}`} onClick={() => setEmiTxn(t)} title={t.emiId ? 'Edit EMI plan' : 'Convert this purchase into monthly instalments'}>
+                        {t.emiId && plans.get(t.emiId) ? (() => { const st = emiStatus(plans.get(t.emiId), cards.get(t.account)); return `EMI ${st.billed}/${st.tenure}`; })() : 'Convert to EMI'}
+                      </button>
+                    )}
                     {t.amount < 0 && ITEMISABLE[t.categoryId] && (
                       <button className={`receipt-btn ${itemised.has(t.id) ? 'done' : ''}`} onClick={() => setReceipt(t)} title={itemised.has(t.id) ? 'Edit receipt items' : 'Add receipt items'}>🧾 {itemised.has(t.id) ? `${itemised.get(t.id)} items` : 'Itemise'}</button>
                     )}
@@ -104,6 +123,7 @@ export default function Transactions({ go }) {
       {splitTxn && <SplitModal txn={splitTxn} onClose={() => setSplitTxn(null)} />}
       {settleTxn && <SettleModal incoming={settleTxn} onClose={() => setSettleTxn(null)} />}
       {receipt && <ReceiptEditor txn={receipt} onClose={() => setReceipt(null)} />}
+      {emiTxn && <Modal title={emiTxn.emiId ? 'EMI plan' : 'Convert to EMI'} onClose={() => setEmiTxn(null)}><EmiForm txn={emiTxn} plan={emiTxn.emiId ? plans.get(emiTxn.emiId) : null} onDone={() => setEmiTxn(null)} /></Modal>}
       {edit && <Modal title={edit.id ? 'Edit transaction' : 'Add transaction'} onClose={() => setEdit(null)}><TxnForm initial={edit.id ? edit : null} onDone={() => setEdit(null)} /></Modal>}
     </div>
   );

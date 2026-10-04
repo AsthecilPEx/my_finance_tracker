@@ -5,6 +5,7 @@ import { round2, sum } from './money.js';
 import { monthlyInterest } from './debt.js';
 import { incomeItems } from './income.js';
 import { financialView } from './view.js';
+import { isCardDebt, isCardEmi, closesBetween, dueAfter, cardBill } from './cards.js';
 
 /** Recurring bills plus paydays generated from the pay profile. */
 export function scheduleItems(state) {
@@ -62,6 +63,32 @@ export function buildOccurrences(state, from, to) {
       });
     }
   }
+  // Tracked credit cards: one bill per statement, worked out from the card's own transactions.
+  // EMI plans are paid through the card bill, so they have no payments of their own.
+  for (const d of (state.debts || []).filter(isCardDebt)) {
+    for (const close of closesBetween(d, addDays(lo, -45), hi)) {
+      const due = dueAfter(d, close);
+      if (due < lo || due > hi) continue;
+      const bill = cardBill(state, d, close);
+      if (bill.payment <= 0) continue; // nothing on the card that month
+      emit({
+        key: `${d.id}:${due}`,
+        sourceId: d.id,
+        source: 'debt',
+        type: 'debt',
+        date: due,
+        name: `${d.name} bill`,
+        amount: -bill.payment,
+        categoryId: 'debt',
+        compulsory: true,
+        match: d.match || d.name,
+        cardBill: true,
+        statementDate: close,
+        statementTotal: bill.total,
+        estimated: bill.estimated,
+      });
+    }
+  }
   for (const d of state.debts || []) {
     const pay = debtPayment(d, state.transactions);
     if (!pay || !d.dueDay) continue;
@@ -94,6 +121,7 @@ export function buildOccurrences(state, from, to) {
  *    few card payments (or the balance) until you enter the statement amount.
  */
 export function debtPayment(d, transactions = []) {
+  if (isCardDebt(d) || isCardEmi(d)) return null; // tracked cards: see cards.js
   const mode = d.payMode || 'minimum';
   if (mode === 'full') {
     const amount = estimateAmount({ ...d, match: d.match || d.lender || d.name, amount: d.balance || d.minPayment || 0 }, transactions);
@@ -136,8 +164,9 @@ export function monthSummary(state, year, month, today) {
   const incomeActual = sum(txns.filter((t) => typeOf(t) === 'income' && t.amount > 0), (t) => t.amount);
   const unmatched = occurrences.filter((o) => !o.matchedTxnId);
   const incomeExpected = sum(unmatched.filter((o) => o.amount > 0), (o) => o.amount);
-  const committedPending = sum(unmatched.filter((o) => o.amount < 0), (o) => -o.amount);
-  const committedUpcoming = sum(unmatched.filter((o) => o.amount < 0 && o.status === 'upcoming'), (o) => -o.amount);
+  // A tracked card's bill pays for purchases already counted as spending, so it isn't committed again.
+  const committedPending = sum(unmatched.filter((o) => o.amount < 0 && !o.cardBill), (o) => -o.amount);
+  const committedUpcoming = sum(unmatched.filter((o) => o.amount < 0 && !o.cardBill && o.status === 'upcoming'), (o) => -o.amount);
 
   const totals = categoryTotalsByMonth(txns)[from.slice(0, 7)] || {};
   const spent = sum(Object.entries(totals).filter(([id]) => isSpendingCategory(cats[id])), ([, v]) => v);
@@ -154,7 +183,7 @@ export function monthSummary(state, year, month, today) {
     .filter((c) => SPENDING_TYPES.has(c.type) || c.type === 'savings')
     .map((c) => {
       const catSpent = Math.max(0, totals[c.id] || 0);
-      const pending = sum(unmatched.filter((o) => o.amount < 0 && o.categoryId === c.id), (o) => -o.amount);
+      const pending = sum(unmatched.filter((o) => o.amount < 0 && !o.cardBill && o.categoryId === c.id), (o) => -o.amount);
       const avg3 = sum(prev, (m) => Math.max(0, m[c.id] || 0)) / monthsWithData;
       const target = c.budget > 0 ? c.budget : avg3;
       return {

@@ -12,6 +12,7 @@ import { addDays } from '../../engine/dates.js';
 import { useUpdateStatus } from '../components/UpdateBanner.jsx';
 import { APP_VERSION } from '../../config.js';
 import { useDialog } from '../components/Dialogs.jsx';
+import { AccountsList } from '../components/Cards.jsx';
 
 export default function Settings() {
   const { state, dispatch, notify, today, fmt } = useApp();
@@ -95,6 +96,12 @@ export default function Settings() {
           <button className="btn ghost" onClick={() => api.toggleWidget()}>Show / hide widget</button>
         </div>
       )}
+
+      <div className="card" id="accounts">
+        <h3>🏦 Your accounts</h3>
+        <p className="muted">Accounts found in your imports and bank sync. Mark credit cards so Pulse works out their bills from their transactions and doesn't count paying them as spending.</p>
+        <AccountsList />
+      </div>
 
       <div className="card">
         <h3>💾 Your data</h3>

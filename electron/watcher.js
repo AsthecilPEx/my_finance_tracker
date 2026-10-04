@@ -72,7 +72,11 @@ export class FolderWatcher {
       // Ignore CSVs that merely happen to have date and amount columns.
       const described = parsed.rows.filter((r) => r.description && r.description !== 'Unknown').length;
       if (parsed.rows.length < 2 || described / parsed.rows.length < 0.6) { markDone(); return false; }
-      await this.onRows(parsed.rows, path.basename(file));
+      // Files from banks Pulse doesn't recognise are named after the file (minus dates), so a card
+      // export (e.g. "barclaycard_2026-09.csv") becomes its own account and Pulse can ask about it.
+      const fallback = path.basename(file).replace(/\.csv$/i, '').replace(/[\d_.-]+/g, ' ').replace(/\s+/g, ' ').trim() || 'Imported statements';
+      const rows = parsed.rows.map((r) => (r.account ? r : { ...r, account: fallback.replace(/\b\w/g, (c) => c.toUpperCase()) }));
+      await this.onRows(rows, path.basename(file));
       markDone();
       return true;
     } catch (err) {

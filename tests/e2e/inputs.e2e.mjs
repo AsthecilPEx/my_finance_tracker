@@ -179,6 +179,39 @@ if (await billQ.count()) {
   if (left) results.fail.push('Entering a variable bill amount did not clear the attention item');
   else results.ok++;
 }
+// Credit card from its own statement: the new-account question, card setup, EMI conversion, Debts.
+await win.evaluate(() => window.pulse.dispatch({ type: 'txn/import', payload: { source: 'csv', fileName: 'barclaycard.csv', rows: [
+  { date: '2026-09-02', amount: 54.2, description: 'TESCO STORES', account: 'Barclaycard' },
+  { date: '2026-09-10', amount: 899, description: 'CURRYS PC WORLD', account: 'Barclaycard' },
+  { date: '2026-09-15', amount: 18.5, description: 'PRET A MANGER', account: 'Barclaycard' },
+] } }));
+await win.getByRole('dialog', { name: 'New account found' }).waitFor({ timeout: 5000 });
+await win.getByRole('button', { name: "Yes, it's a credit card" }).click();
+await checkInputs('Card setup', '.modal');
+await win.locator('.modal input[placeholder="e.g. 28"]').fill('28');
+await win.locator('.modal input[placeholder="e.g. 20"]').fill('20');
+await win.locator('.modal input').first().fill('Barclaycard');
+if (!(await win.locator('.modal input[type=checkbox]').last().isChecked())) results.fail.push('Card setup did not spot positive purchases in the file');
+await win.locator('.modal').getByRole('button', { name: 'Save card' }).click();
+await win.waitForTimeout(300);
+await nav('Transactions');
+await win.locator('.filters select[aria-label=Account]').selectOption('Barclaycard');
+await win.getByRole('button', { name: 'Convert to EMI' }).first().waitFor({ timeout: 3000 });
+const currysRow = win.locator('tr', { hasText: 'CURRYS PC WORLD' });
+await currysRow.getByRole('button', { name: 'Convert to EMI' }).click();
+await checkInputs('Convert to EMI', '.modal');
+await win.locator('.modal').getByRole('button', { name: 'Cancel' }).click();
+await currysRow.getByRole('button', { name: 'Convert to EMI' }).click();
+await win.locator('.modal').getByRole('button', { name: 'Convert to EMI' }).click();
+await win.waitForTimeout(300);
+await nav('Debts & Loans');
+const emiCard = await win.locator('.card.debt', { hasText: 'EMI on Barclaycard' }).count();
+const cardCard = await win.locator('.card.debt', { hasText: 'Next bill' }).count();
+if (!emiCard || !cardCard) results.fail.push(`Debts page missing tracked card (${cardCard}) or EMI plan (${emiCard})`); else results.ok++;
+await win.getByLabel('Edit Barclaycard').click(); await checkInputs('Edit card', '.modal'); await closeModal();
+await nav('Settings');
+if (!(await win.locator('#accounts select[aria-label="Type of Barclaycard"]').count())) results.fail.push('Settings › accounts list missing the card'); else results.ok++;
+
 await nav('Dashboard'); await checkInputs('Dashboard after all');
 
 console.log(`inputs typed OK: ${results.ok}`);

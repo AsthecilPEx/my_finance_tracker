@@ -582,3 +582,13 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 6px; font-
 .guides .list-row { align-items: baseline; gap: 12px; }
 .guides b.nowrap { min-width: 220px; }
 @media (max-width: 720px) { .guides .list-row { flex-direction: column; gap: 2px; } .guides b.nowrap { min-width: 0; } }
+
+/* Tracked credit cards and EMI plans */
+.section-title { font-size: 15px; margin: 18px 0 10px; color: var(--muted, #a0a0ab); font-weight: 600; }
+.card-bill { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 6px; }
+.card-bill > div { display: flex; flex-direction: column; gap: 2px; background: #ffffff08; border-radius: 10px; padding: 8px 10px; }
+.card-bill b { font-size: 18px; }
+.card.debt.inactive { opacity: 0.6; }
+.src.card-src { background: #7c5cff22; }
+.row2.tight { gap: 8px; }
+@media (max-width: 720px) { .card-bill { grid-template-columns: 1fr; } }

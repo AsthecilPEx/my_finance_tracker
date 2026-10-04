@@ -4,6 +4,7 @@ import { daysBetween } from './dates.js';
 import { normaliseItem } from './receipts.js';
 import { applyPlan, undoPlan } from './aiplan.js';
 import { toBase, baseCurrency, rateFor } from './fx.js';
+import { applyCardRules, isCardDebt, isCardEmi, isCardPayment, instalmentFor, usableMatch } from './cards.js';
 
 export const STATE_VERSION = 2;
 
@@ -37,6 +38,7 @@ export function createEmptyState() {
     accounts: [],
     imports: [],
     bankImports: {},
+    accountTypes: {}, // account name -> 'bank' | 'card' (cards are debts with cardAccount)
     receipts: [],
     receiptSkips: [],
     itemRules: {},
@@ -121,6 +123,7 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
       duplicates++;
       continue;
     }
+    row = applyCardRules(state, row); // card exports' signs, card bill payments as transfers
     if (row.currency && row.currency !== base) row = foreignRow(state, row);
     const base = importKey(row);
     const n = (seen.get(base) || 0) + 1;
@@ -220,8 +223,89 @@ export function reduce(state, action) {
 
     case 'debt/save':
       return { ...state, debts: upsert(state.debts, { ...p, balance: round2(+p.balance || 0), originalBalance: p.originalBalance || +p.balance || 0 }) };
-    case 'debt/delete':
-      return { ...state, debts: state.debts.filter((d) => d.id !== p.id) };
+    case 'debt/delete': {
+      const d = state.debts.find((x) => x.id === p.id);
+      if (!d) return state;
+      // Removing a tracked card removes its EMI plans; removing a plan puts the purchase back to normal.
+      const gone = new Set([d.id, ...(isCardDebt(d) ? state.debts.filter((x) => isCardEmi(x) && x.viaCard === d.id).map((x) => x.id) : [])]);
+      return {
+        ...state,
+        debts: state.debts.filter((x) => !gone.has(x.id)),
+        transactions: state.transactions.map((t) => (t.emiId && gone.has(t.emiId) ? (({ emiId, ...rest }) => rest)(t) : t)),
+        accountTypes: isCardDebt(d) ? { ...(state.accountTypes || {}), [d.cardAccount]: 'bank' } : state.accountTypes,
+      };
+    }
+
+    // ---- accounts and tracked credit cards
+    case 'account/classify':
+      return { ...state, accountTypes: { ...(state.accountTypes || {}), [p.account]: p.kind } };
+    case 'card/save': {
+      const prev = state.debts.find((d) => d.id === p.id) || state.debts.find((d) => isCardDebt(d) && d.cardAccount === p.cardAccount);
+      const card = {
+        ...(prev || {}),
+        ...p,
+        id: prev?.id || p.id || newId(),
+        type: 'credit-card',
+        statementDay: Math.min(31, Math.max(1, parseInt(p.statementDay, 10) || 1)),
+        dueDay: Math.min(31, Math.max(1, parseInt(p.dueDay, 10) || 1)),
+        apr: +p.apr || 0,
+        minPct: p.minPct === '' || p.minPct === undefined ? 3 : +p.minPct,
+        minFloor: p.minFloor === '' || p.minFloor === undefined ? 25 : +p.minFloor,
+        fixedPayment: +p.fixedPayment || 0,
+        creditLimit: +p.creditLimit || 0,
+        match: String(p.match || p.name || '').toLowerCase().trim(),
+        flipSign: !!p.flipSign,
+        balance: 0,
+      };
+      const flip = !!prev?.flipSign !== card.flipSign;
+      const transactions = state.transactions.map((t) => {
+        let next = t;
+        if (t.account === card.cardAccount) {
+          if (flip) {
+            const suffix = (t.importKey || '').split('#')[1];
+            next = { ...next, amount: -next.amount, ...(t.importKey ? { importKey: `${importKey({ ...t, amount: -t.amount })}#${suffix || 1}` } : {}) };
+          }
+          if (!next.manualCategory && isCardPayment({ ...next, categoryId: '' })) next = { ...next, categoryId: 'transfer' };
+        } else if (!t.manualCategory && t.amount < 0 && usableMatch(card) && String(t.description || '').toLowerCase().includes(usableMatch(card))) {
+          next = { ...next, categoryId: 'transfer' }; // paying this card's bill from a bank account
+        }
+        return next;
+      });
+      return {
+        ...state,
+        transactions,
+        debts: prev ? state.debts.map((d) => (d.id === prev.id ? card : d)) : [...state.debts, card],
+        accountTypes: { ...(state.accountTypes || {}), [card.cardAccount]: 'card' },
+      };
+    }
+    case 'emi/save': {
+      const txn = state.transactions.find((t) => t.id === p.txnId);
+      const card = txn && state.debts.find((d) => isCardDebt(d) && d.cardAccount === txn.account);
+      if (!txn || !card || txn.amount >= 0) return state;
+      const prev = state.debts.find((d) => d.id === p.id);
+      const principal = round2(Math.abs(+p.principal || txn.amount));
+      const plan = {
+        ...(prev || {}),
+        id: prev?.id || p.id || newId(),
+        type: 'card-emi',
+        name: p.name || `${txn.description} EMI`,
+        viaCard: card.id,
+        txnId: txn.id,
+        principal,
+        apr: +p.apr || 0,
+        tenure: Math.max(1, parseInt(p.tenure, 10) || 1),
+        fee: +p.fee || 0,
+        firstClose: p.firstClose,
+        instalment: instalmentFor(principal, +p.apr || 0, parseInt(p.tenure, 10) || 1),
+        lender: card.name,
+        balance: principal,
+      };
+      return {
+        ...state,
+        debts: prev ? state.debts.map((d) => (d.id === prev.id ? plan : d)) : [...state.debts, plan],
+        transactions: state.transactions.map((t) => (t.id === txn.id ? { ...t, emiId: plan.id } : t)),
+      };
+    }
 
     case 'category/save':
       return { ...state, categories: upsert(state.categories, p) };

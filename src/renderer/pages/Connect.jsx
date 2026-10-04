@@ -213,11 +213,15 @@ function CsvImport() {
   const [file, setFile] = useState(null);
   const [invert, setInvert] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [account, setAccount] = useState('');
+  const known = [...new Set(state.transactions.filter((t) => t.account && !['manual', 'demo'].includes(t.source)).map((t) => t.account))].sort();
 
   useEffect(() => {
     if (!file) return setPreview(null);
     try {
-      setPreview({ ...parseStatement(file.text, { invertSign: invert }) });
+      const p = parseStatement(file.text, { invertSign: invert });
+      setPreview(p);
+      setAccount((a) => a || p.rows[0]?.account || file.name.replace(/\.csv$/i, '').replace(/[_-]+/g, ' ').trim());
     } catch (e) {
       setPreview({ error: e.message });
     }
@@ -225,12 +229,13 @@ function CsvImport() {
 
   const pick = async () => {
     const f = await api.openCsvFile();
-    if (f) { setFile(f); setInvert(false); }
+    if (f) { setFile(f); setInvert(false); setAccount(''); }
   };
 
   const doImport = async () => {
     const before = state.transactions.length;
-    const next = await dispatch({ type: 'txn/import', payload: { rows: preview.rows, source: 'csv', fileName: file.name } });
+    const rows = preview.rows.map((r) => ({ ...r, account: account.trim() || r.account || '' }));
+    const next = await dispatch({ type: 'txn/import', payload: { rows, source: 'csv', fileName: file.name } });
     const added = next.transactions.length - before;
     notify(`Imported ${added} new transaction${added === 1 ? '' : 's'}${preview.rows.length - added ? ` · ${preview.rows.length - added} already in Pulse` : ''}`, 'good');
     setFile(null);
@@ -248,6 +253,10 @@ function CsvImport() {
             <h4>{preview.bankName ? `${preview.bankName} statement` : file.name}: {preview.rows.length} transactions found{preview.skipped ? ` · ${preview.skipped} pending or declined left out` : ''}{preview.errors.length ? ` · ${preview.errors.length} rows unreadable` : ''}</h4>
             <label className="check inline"><input type="checkbox" checked={invert} onChange={(e) => setInvert(e.target.checked)} /><span>Flip signs (credit card statements)</span></label>
           </div>
+          <Field label="Which account is this statement from?" hint="Name it once (e.g. Lloyds Current, Barclaycard). A new account name asks whether it's a credit card.">
+            <input value={account} onChange={(e) => setAccount(e.target.value)} list="known-accounts" placeholder="e.g. Barclaycard" />
+          </Field>
+          <datalist id="known-accounts">{known.map((a) => <option key={a} value={a} />)}</datalist>
           <table className="table">
             <thead><tr><th>Date</th><th>Description</th><th>Auto category</th><th className="num">Amount</th></tr></thead>
             <tbody>
