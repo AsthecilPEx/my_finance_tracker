@@ -144,24 +144,67 @@ export function emiStatus(plan, card, date = todayISO()) {
 // Real card transactions only (the financial view also holds generated EMI instalment lines).
 const cardTxns = (state, card) => (state.transactions || []).filter((t) => t.account === card.cardAccount && !t.virtual);
 
-/** The statement for the cycle ending on `close`. */
+/** The statement date that closes the cycle a transaction on `date` falls in. */
+export function closeOnOrAfter(card, date) {
+  const c = closeOnOrBefore(card, date);
+  return c === date ? c : nextClose(card, c);
+}
+
+/** Cards like Monzo Flex split every purchase into monthly payments (e.g. 3 months at 0%). */
+export const spreadOf = (card) => (card?.spread && Number(card.spread.months) > 1 ? { months: Math.round(Number(card.spread.months)), apr: Number(card.spread.apr) || 0 } : null);
+
+/** A purchase on a spreading card, as an implicit instalment plan billed from its own cycle. */
+function spreadPlan(card, t) {
+  const sp = spreadOf(card);
+  return { principal: -(t.rawAmount ?? t.amount), apr: sp.apr, tenure: sp.months, fee: 0, firstClose: closeOnOrAfter(card, t.date) };
+}
+
+/**
+ * The statement for the cycle ending on `close`, with every line that makes it up:
+ * purchases in the cycle (or, on a spreading card, the instalments of recent purchases due on
+ * this statement), minus refunds, plus EMI instalments.
+ */
 export function statementFor(state, card, close) {
   const start = addDays(previousClose(card, close), 1);
+  const sp = spreadOf(card);
+  const lines = [];
   let purchases = 0;
   let refunds = 0;
   let payments = 0;
+  let spread = 0;
+  // A spreading card bills purchases from up to `months` cycles back.
+  let from = start;
+  if (sp) for (let i = 1; i < sp.months; i++) from = addDays(previousClose(card, addDays(from, -1)), 1);
   for (const t of cardTxns(state, card)) {
-    if (t.date < start || t.date > close) continue;
+    if (t.date < from || t.date > close) continue;
     const amt = t.rawAmount ?? t.amount;
-    if (amt < 0) { if (!t.emiId) purchases += -amt; }
-    else if (isCardPayment(t)) payments += amt;
-    else refunds += amt;
+    if (amt < 0) {
+      if (t.emiId) continue; // billed through its own EMI plan
+      if (sp) {
+        const r = emiSchedule(spreadPlan(card, t), card).find((x) => x.date === close);
+        if (r) { spread += r.amount; lines.push({ date: t.date, description: t.description, amount: r.amount, kind: 'instalment', k: r.k, n: sp.months, original: round2(-amt) }); }
+      } else if (t.date >= start) {
+        purchases += -amt;
+        lines.push({ date: t.date, description: t.description, amount: round2(-amt), kind: 'purchase' });
+      }
+    } else if (t.date >= start) {
+      if (isCardPayment(t)) payments += amt;
+      else { refunds += amt; lines.push({ date: t.date, description: t.description, amount: round2(-amt), kind: 'refund' }); }
+    }
   }
   let emi = 0;
   for (const plan of emiPlans(state, card)) {
-    for (const r of emiSchedule(plan, card)) if (r.date >= start && r.date <= close) emi += r.amount;
+    for (const r of emiSchedule(plan, card)) {
+      if (r.date >= start && r.date <= close) { emi += r.amount; lines.push({ date: r.date, description: plan.name, amount: r.amount, kind: 'emi', k: r.k, n: plan.tenure }); }
+    }
   }
-  return { start, close, purchases: round2(purchases), refunds: round2(refunds), payments: round2(payments), emi: round2(emi), total: round2(Math.max(0, purchases - refunds + emi)) };
+  lines.sort((a, b) => a.date.localeCompare(b.date));
+  return {
+    start, close, from,
+    purchases: round2(purchases), spread: round2(spread), refunds: round2(refunds), payments: round2(payments), emi: round2(emi),
+    total: round2(Math.max(0, purchases + spread - refunds + emi)),
+    lines,
+  };
 }
 
 /** What you'll pay on a statement of `total`, given how you pay this card. */
@@ -180,10 +223,14 @@ export function paymentFor(card, total) {
 /**
  * The bill for each statement date: the real statement once Pulse has transactions up to that
  * date, otherwise an estimate (spending so far, or the recent average if that's higher).
+ * A bill amount you've typed in (from the card or the calendar) always wins.
+ * `historyGap` flags a bill that may be missing older purchases Pulse never received.
  */
 export function cardBill(state, card, close) {
   const st = statementFor(state, card, close);
-  const latest = cardTxns(state, card).reduce((m, t) => (t.date > m ? t.date : m), '');
+  const txns = cardTxns(state, card);
+  const latest = txns.reduce((m, t) => (t.date > m ? t.date : m), '');
+  const earliest = txns.reduce((m, t) => (!m || t.date < m ? t.date : m), '');
   const complete = !!latest && latest >= close;
   let total = st.total;
   if (!complete) {
@@ -193,26 +240,40 @@ export function cardBill(state, card, close) {
     const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
     total = round2(Math.max(st.total, avg));
   }
-  return { ...st, total, estimated: !complete, due: dueAfter(card, close), payment: paymentFor(card, total) };
+  const due = dueAfter(card, close);
+  const entered = state.overrides?.[`${card.id}:${due}`];
+  const historyGap = !!earliest && earliest > st.from;
+  if (entered && typeof entered.amount === 'number') {
+    return { ...st, total: entered.amount, calculated: total, entered: true, estimated: false, historyGap, historyFrom: earliest, due, payment: round2(entered.amount) };
+  }
+  return { ...st, total, calculated: total, estimated: !complete, historyGap, historyFrom: earliest, due, payment: paymentFor(card, total) };
 }
 
 /** What's owed on the card now (excluding EMI principal not yet billed, which is tracked on its plan). */
 export function cardOutstanding(state, card, today = todayISO()) {
   const txns = cardTxns(state, card);
+  const sp = spreadOf(card);
   const instalmentsBetween = (from, to) => emiPlans(state, card).reduce((s, p) => s + emiSchedule(p, card).filter((r) => r.date > from && r.date <= to).reduce((a, r) => a + r.amount, 0), 0);
   if (card.balanceAsOf && card.balanceAsOf.date) {
     const { amount, date } = card.balanceAsOf;
     const moved = txns.filter((t) => t.date > date && !t.emiId).reduce((s, t) => s - (t.rawAmount ?? t.amount), 0);
     return round2(Math.max(0, Number(amount) + moved + instalmentsBetween(date, today)));
   }
-  // No opening balance given: the last statement (unless it's been paid) plus spending since.
+  // No opening balance given: the last statement (unless it's been paid), plus everything still
+  // to be billed: spending since, and on a spreading card the instalments not billed yet.
   const close = closeOnOrBefore(card, today);
-  const last = statementFor(state, card, close);
+  const last = cardBill(state, card, close);
   const since = txns.filter((t) => t.date > close && t.date <= today);
   const paidSince = since.filter(isCardPayment).reduce((s, t) => s + t.amount, 0);
-  const spentSince = since.filter((t) => (t.rawAmount ?? t.amount) < 0 && !t.emiId).reduce((s, t) => s - (t.rawAmount ?? t.amount), 0);
   const refundsSince = since.filter((t) => t.amount > 0 && !isCardPayment(t)).reduce((s, t) => s + t.amount, 0);
-  return round2(Math.max(0, last.total - paidSince) + Math.max(0, spentSince - refundsSince) + instalmentsBetween(close, today));
+  let toBill;
+  if (sp) {
+    toBill = txns.filter((t) => (t.rawAmount ?? t.amount) < 0 && !t.emiId && t.date <= today)
+      .reduce((s, t) => s + emiSchedule(spreadPlan(card, t), card).filter((r) => r.date > close).reduce((a, r) => a + r.amount, 0), 0);
+  } else {
+    toBill = since.filter((t) => (t.rawAmount ?? t.amount) < 0 && !t.emiId).reduce((s, t) => s - (t.rawAmount ?? t.amount), 0);
+  }
+  return round2(Math.max(0, last.total - paidSince) + Math.max(0, toBill - refundsSince) + instalmentsBetween(close, today));
 }
 
 // ---------------- imports ----------------
@@ -237,6 +298,7 @@ export function unclassifiedAccounts(state) {
   return [...seen.values()].map((s) => ({
     ...s,
     likelyCard: /flex|card|amex|american express|credit|mbna|capital one|vanquis|aqua|zopa/i.test(s.account),
+    flex: /\bflex\b/i.test(s.account),
     // Card exports often list purchases as positive numbers.
     looksFlipped: s.count >= 3 && s.positive / s.count > 0.6,
   }));

@@ -255,6 +255,8 @@ export function reduce(state, action) {
         creditLimit: +p.creditLimit || 0,
         match: String(p.match || p.name || '').toLowerCase().trim(),
         flipSign: !!p.flipSign,
+        // Cards like Monzo Flex that split every purchase into monthly payments.
+        spread: p.spread && +p.spread.months > 1 ? { months: Math.round(+p.spread.months), apr: +p.spread.apr || 0 } : null,
         balance: 0,
       };
       const flip = !!prev?.flipSign !== card.flipSign;

@@ -58,7 +58,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     if (dismissed.has(key)) continue;
     used.add(match.id); used.add(o.id);
     items.push({ key, kind: 'transfer', icon: '🔁', txnIds: [o.id, match.id], amount: -o.amount, date: match.date,
-      title: `Transfer between your accounts?`, detail: `${o.account} → ${match.account} on ${match.date}. If yes, it won't count as money in or spending.` });
+      title: `Transfer between your accounts?`, detail: `${o.account} → ${match.account} · ${match.date}` });
   }
 
   // 2) Money in that isn't pay and hasn't been placed.
@@ -85,7 +85,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     const key = `split:${s.txn.id}:${s.txn.split.expectedBy}`;
     if (dismissed.has(key)) continue;
     items.push({ key, kind: 'split-overdue', icon: '🤝', txnIds: [s.txn.id], amount: round2(s.outstanding), date: s.txn.date,
-      title: `${s.txn.split.who || 'Someone'} still owes you`, detail: `For ${s.txn.description} on ${s.txn.date}. Expected by ${s.txn.split.expectedBy}.${s.txn.split.trackedElsewhere ? '' : ' Not on Splitwise yet.'}` });
+      title: `${s.txn.split.who || 'Someone'} still owes you`, detail: `${s.txn.description} · ${s.txn.date} · was due ${s.txn.split.expectedBy}` });
   }
 
   // 5) Bills that change every time and are due soon: what's the real amount?
@@ -95,7 +95,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     const card = o.source === 'debt';
     items.push({ key, kind: 'bill-amount', icon: card ? '💳' : '🧾', occKey: o.key, amount: -o.amount, date: o.date, estimate: -o.amount,
       title: card ? `${o.name} statement: how much is due?` : `${o.name}: what's this bill?`,
-      detail: `Due ${o.date}. Pulse is planning ≈ ${formatMoney(-o.amount, state.settings?.currency || 'GBP')} from your recent payments. Enter the real amount once it's out.` });
+      detail: `Due ${o.date} · planning ≈ ${formatMoney(-o.amount, state.settings?.currency || 'GBP')}` });
   }
 
   items.sort((a, b) => b.date.localeCompare(a.date));

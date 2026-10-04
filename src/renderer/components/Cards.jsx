@@ -29,12 +29,17 @@ export function NewAccountPrompt() {
   return (
     <Modal title="New account found" onClose={() => setLater((l) => [...l, a.account])}>
       <div className="form">
-        <p>Pulse found <b>{a.account}</b> in {SOURCE_LABEL[a.source] || 'your import'}: {a.count} transaction{a.count === 1 ? '' : 's'} from {a.first} to {a.last}.</p>
-        <p className="muted"><b>Is this a credit card?</b> If it is, Pulse tracks its purchases, works out each monthly bill from them, lets you turn big purchases into EMI plans, and makes sure paying the bill isn't counted as spending twice.</p>
+        <p>New account from {SOURCE_LABEL[a.source] || 'your import'}: <b>{a.account}</b> <span className="muted sm">({a.count} transaction{a.count === 1 ? '' : 's'} so far)</span></p>
+        <p><b>Is it a credit card?</b> If yes, Pulse will:</p>
+        <ul className="tidy">
+          <li>work out each bill from its purchases, once you set its dates</li>
+          <li>let you turn big purchases into EMI plans</li>
+          <li>not count paying the bill as extra spending</li>
+        </ul>
         <div className="form-actions">
           <button type="button" className="btn ghost" onClick={() => setLater((l) => [...l, a.account])}>Ask me later</button>
           <button type="button" className="btn ghost" onClick={() => { dispatch({ type: 'account/classify', payload: { account: a.account, kind: 'bank' } }); notify(`${a.account} saved as a bank account`, 'good'); }}>No, it's a bank account</button>
-          <button type="button" className={`btn ${a.likelyCard ? 'primary' : 'ghost'}`} onClick={() => setSetup({ cardAccount: a.account, name: a.account, flipSign: a.looksFlipped, suggestedFlip: a.looksFlipped })}>Yes, it's a credit card</button>
+          <button type="button" className={`btn ${a.likelyCard ? 'primary' : 'ghost'}`} onClick={() => setSetup({ cardAccount: a.account, name: a.account, flipSign: a.looksFlipped, suggestedFlip: a.looksFlipped, ...(a.flex ? { spread: { months: 3, apr: 0 }, match: 'monzo flex' } : {}) })}>Yes, it's a credit card</button>
         </div>
       </div>
     </Modal>
@@ -59,7 +64,6 @@ export function CardForm({ initial, onDone }) {
     notify(`${f.name} is set up. Its bills now come from its transactions.`, 'good');
     onDone();
   };
-  const sampleClose = f.statementDay ? `the ${ordinal(+f.statementDay)}` : 'your statement date';
   // A card you'd added by hand on the Debts page would now be counted twice.
   const words = [f.name, f.match, f.cardAccount].map((x) => String(x || '').toLowerCase().trim()).filter(Boolean);
   const manualTwin = (state.debts || []).find((d) => !d.cardAccount && d.type === 'credit-card' && words.some((w) => [d.name, d.lender, d.match].some((x) => String(x || '').toLowerCase().includes(w) || w.includes(String(x || '').toLowerCase().trim() || '\u0000'))));
@@ -67,7 +71,7 @@ export function CardForm({ initial, onDone }) {
     <form onSubmit={submit} className="form">
       <div className="row2">
         <Field label="Card name"><input required value={f.name} onChange={set('name')} placeholder="e.g. Barclaycard" /></Field>
-        <Field label="Account in your imports"><input readOnly value={f.cardAccount} /></Field>
+        <Field label="Linked to transactions from" hint="Filled in for you."><input readOnly value={f.cardAccount} /></Field>
       </div>
       <div className="row2">
         <Field label="Statement date (day of month)" hint="When each monthly statement is issued."><input type="number" min="1" max="31" required value={f.statementDay} onChange={set('statementDay')} placeholder="e.g. 28" /></Field>
@@ -95,22 +99,31 @@ export function CardForm({ initial, onDone }) {
         <Field label="Credit limit (optional)"><input type="number" step="1" min="0" value={f.creditLimit} onChange={set('creditLimit')} /></Field>
         {f.payMode === 'full' && <Field label="Bill payment on your bank statement" hint="So paying the card isn't counted as spending."><input value={f.match} onChange={set('match')} placeholder={(f.name || 'barclaycard').toLowerCase()} /></Field>}
       </div>
-      {f.payMode !== 'full' && <Field label="Bill payment on your bank statement" hint="Text on your bank statement when you pay this card, so it's treated as a transfer, not spending."><input value={f.match} onChange={set('match')} placeholder={(f.name || 'barclaycard').toLowerCase()} /></Field>}
+      {f.payMode !== 'full' && <Field label="Bill payment on your bank statement" hint="So paying the card isn't counted as spending."><input value={f.match} onChange={set('match')} placeholder={(f.name || 'barclaycard').toLowerCase()} /></Field>}
       <div className="row2">
-        <Field label="Balance owed now (optional)" hint="Makes the balance exact. Leave blank to work it out from your statements."><input type="number" step="0.01" min="0" value={f.openBalance} onChange={set('openBalance')} /></Field>
+        <Field label="Balance owed now (optional)" hint="Leave blank to use your statements."><input type="number" step="0.01" min="0" value={f.openBalance} onChange={set('openBalance')} /></Field>
         <Field label="As of"><input type="date" value={f.openDate} onChange={set('openDate')} /></Field>
       </div>
       <label className="check">
+        <input type="checkbox" checked={!!f.spread} onChange={(e) => setF((x) => ({ ...x, spread: e.target.checked ? { months: 3, apr: 0 } : null }))} />
+        <span><b>Purchases are split into monthly payments</b> (like Monzo Flex)</span>
+      </label>
+      {f.spread && (
+        <div className="row2">
+          <Field label="Split each purchase over (months)"><input type="number" min="2" max="24" value={f.spread.months} onChange={(e) => setF((x) => ({ ...x, spread: { ...x.spread, months: e.target.value } }))} /></Field>
+          <Field label="Interest on the split (APR %)" hint="0 for Flex's interest-free 3 months."><input type="number" step="0.01" min="0" value={f.spread.apr} onChange={(e) => setF((x) => ({ ...x, spread: { ...x.spread, apr: e.target.value } }))} /></Field>
+        </div>
+      )}
+      <label className="check">
         <input type="checkbox" checked={!!f.flipSign} onChange={set('flipSign')} />
-        <span><b>Purchases show as positive numbers in this card's file.</b> Many card exports do this; Pulse flips them so purchases count as spending.{f.suggestedFlip ? ' Pulse spotted this in your file.' : ''}</span>
+        <span><b>Purchases show as positive numbers</b> in this card's file{f.suggestedFlip ? ' (Pulse spotted this)' : ''}</span>
       </label>
       {manualTwin && (
         <div className="callout warn">
-          <p>You also added <b>{manualTwin.name}</b> by hand on the Debts page. Once this card is tracked from its transactions, that entry would count it twice.</p>
+          <p>You also added <b>{manualTwin.name}</b> by hand on Debts. Remove it so it isn't counted twice.</p>
           <button type="button" className="btn ghost sm" onClick={() => { dispatch({ type: 'debt/delete', payload: { id: manualTwin.id } }); notify(`Removed the manual ${manualTwin.name} entry`, 'info'); }}>Remove the manual entry</button>
         </div>
       )}
-      <p className="muted sm">Each bill covers purchases from the day after one statement up to {sampleClose}, minus refunds, plus any EMI instalments. It's shown on your calendar on its due date and ticked off when the payment appears.</p>
       <div className="form-actions">
         <button type="button" className="btn ghost" onClick={onDone}>Cancel</button>
         <button className="btn primary">Save card</button>
@@ -128,7 +141,7 @@ export function EmiForm({ txn, plan, onDone }) {
   const [f, setF] = useState(() => ({
     name: plan?.name || `${txn.description} EMI`,
     principal: plan?.principal ?? Math.abs(txn.amount),
-    tenure: plan?.tenure ?? 6,
+    tenure: plan?.tenure ?? (card?.spread ? card.spread.months : 6),
     apr: plan?.apr ?? 0,
     fee: plan?.fee ?? 0,
     firstClose: plan?.firstClose || first,
@@ -138,6 +151,11 @@ export function EmiForm({ txn, plan, onDone }) {
   const rows = card && +f.principal > 0 ? emiSchedule({ principal: +f.principal, apr: +f.apr || 0, tenure: n, fee: +f.fee || 0, firstClose: f.firstClose }, card) : [];
   const interest = rows.reduce((s, r) => s + r.interest, 0);
   if (!card) return <p className="error">Set up {txn.account} as a credit card first.</p>;
+  const payInFull = async () => {
+    await dispatch({ type: 'emi/save', payload: { name: `${txn.description} (paid in full)`, principal: Math.abs(txn.amount), tenure: 1, apr: 0, fee: 0, firstClose: first, id: plan?.id, txnId: txn.id } });
+    notify(`${txn.description} will be paid in full on the ${first} bill`, 'good');
+    onDone();
+  };
   const submit = async (e) => {
     e.preventDefault();
     await dispatch({ type: 'emi/save', payload: { ...f, id: plan?.id, txnId: txn.id } });
@@ -147,6 +165,12 @@ export function EmiForm({ txn, plan, onDone }) {
   return (
     <form onSubmit={submit} className="form">
       <p className="muted">{txn.description} on {txn.date} with {card.name}: <b>{fmt(Math.abs(txn.amount))}</b></p>
+      {card.spread && (
+        <div className="callout">
+          <p>{card.name} splits purchases over {card.spread.months} months. Did this one differ in your card's app? Set it here.</p>
+          <button type="button" className="btn ghost sm" onClick={payInFull}>Pay this one in full on the next bill</button>
+        </div>
+      )}
       <div className="row2">
         <Field label="Plan name"><input required value={f.name} onChange={set('name')} /></Field>
         <Field label="Amount converted to EMI"><input type="number" step="0.01" min="1" max={Math.abs(txn.amount)} required value={f.principal} onChange={set('principal')} /></Field>
@@ -165,7 +189,7 @@ export function EmiForm({ txn, plan, onDone }) {
       {rows.length > 0 && (
         <div className="callout">
           <p><b>{fmt(rows[Math.min(1, rows.length - 1)].amount)} a month</b> for {n} months{+f.fee > 0 ? ` (first one ${fmt(rows[0].amount)} with the fee)` : ''}. Last instalment on the {rows[rows.length - 1].date} statement.</p>
-          <p className="muted sm">Interest {fmt(interest)} · total cost {fmt(rows.reduce((s, r) => s + r.amount, 0))}. The purchase stops counting as one {fmt(+f.principal)} spend; each instalment counts in the month it's billed.</p>
+          <p className="muted sm">Interest {fmt(interest)} · total {fmt(rows.reduce((s, r) => s + r.amount, 0))} · counted as spending one instalment a month</p>
         </div>
       )}
       <div className="form-actions">

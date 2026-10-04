@@ -38,7 +38,7 @@ export default function AIPlan() {
   return (
     <div className="page narrow">
       <header className="page-head">
-        <div><h1>AI Plan</h1><p className="muted">Get a second opinion from any AI assistant, then load its plan straight into Pulse. You stay in control: nothing changes until you tick it.</p></div>
+        <div><h1>AI Plan</h1><p className="muted">Ask any AI assistant for a plan, then load it in. Nothing changes until you tick it.</p></div>
       </header>
 
       <div className="card step-card">
@@ -46,7 +46,7 @@ export default function AIPlan() {
         <div className="grow">
           <h3>Describe what's going on (optional)</h3>
           <textarea rows={4} value={situation} onChange={(e) => setSituation(e.target.value)} placeholder="e.g. I'm paid weekly on zero-hours, rent is due on the 1st and I always struggle that week. I want to clear my credit card by summer and save for a deposit." />
-          <p className="muted sm">Pulse adds a summary of your pay, bills, debts, spending, receipts, caps and goals. It leaves out your name, account details and transactions.</p>
+          <p className="muted sm">Includes a summary of your finances; leaves out your name, accounts and transactions.</p>
           <div className="inline-row wrap">
             <button className="btn primary" onClick={copy}>📋 Copy prompt</button>
             <button className="btn ghost" onClick={() => api.saveText(prompt, 'pulse-ai-prompt.txt')}>Save as file</button>

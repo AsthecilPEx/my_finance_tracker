@@ -155,7 +155,7 @@ export function RecurringForm({ initial, onDone }) {
       {!isIn && (
         <label className="check">
           <input type="checkbox" checked={!!f.variable} onChange={set('variable')} />
-          <span><b>Amount changes each time</b> (energy, water, phone usage, card statements). Pulse plans with the average of your last 3 payments, ticks it off whatever the amount, and reminds you to enter the real bill when it's due.</span>
+          <span><b>Amount changes each time</b> (energy, water, phone). Pulse plans with your recent average.</span>
         </label>
       )}
       <div className="row2">
@@ -262,7 +262,7 @@ export function DebtForm({ initial, onDone }) {
               <Field label="Statement day (optional)" hint="When your monthly statement is issued."><input type="number" min="1" max="31" value={f.statementDay} onChange={set('statementDay')} placeholder="e.g. 28" /></Field>
             )}
           </div>
-          {f.payMode === 'full' && <p className="muted sm">The statement balance changes every month. Pulse estimates it from your recent card payments and, from your statement day, asks you for the real amount.</p>}
+          {f.payMode === 'full' && <p className="muted sm">Pulse estimates each statement and asks for the real amount when it's out.</p>}
         </>
       )}
       <Field label="Lender / statement keyword" hint="Payments containing this text are matched automatically."><input value={f.lender} onChange={set('lender')} placeholder="e.g. Barclaycard" /></Field>

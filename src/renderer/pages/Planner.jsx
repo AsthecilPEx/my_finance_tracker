@@ -70,7 +70,7 @@ export default function Planner({ go }) {
             );
           })}
           {vari && vari.cv > 0.08 && (
-            <div className="callout">📉 Your pay has varied between <b>{fmt(vari.min, { decimals: 0 })}</b> and <b>{fmt(vari.max, { decimals: 0 })}</b> a month over the last {vari.months} months. Plan on the low end; anything extra goes to your buffer first.</div>
+            <div className="callout">📉 Your pay has varied between <b>{fmt(vari.min, { decimals: 0 })}</b> and <b>{fmt(vari.max, { decimals: 0 })}</b> a month over the last {vari.months} months. Plan on the low end.</div>
           )}
         </div>
 
@@ -82,14 +82,18 @@ export default function Planner({ go }) {
             </Ring>
             <div>
               <p>To keep every bill paid on time and spend a steady <b>{fmt(plan.allowancePerDay, { decimals: 0 })}/day</b>, you need about <b>{fmt(plan.startingBuffer, { decimals: 0 })}</b> set aside today.</p>
-              <p className="muted sm">That's {fmt(plan.billsBuffer, { decimals: 0 })} for bills that land before your pot has built up, plus {fmt(plan.spendBuffer, { decimals: 0 })} to even out the gaps between paydays. You have {fmt(plan.potBalance, { decimals: 0 })} (set in Settings).</p>
+              <ul className="tidy muted sm">
+                <li>{fmt(plan.billsBuffer, { decimals: 0 })} for early bills</li>
+                <li>{fmt(plan.spendBuffer, { decimals: 0 })} to even out paydays</li>
+                <li>You have {fmt(plan.potBalance, { decimals: 0 })}</li>
+              </ul>
               {plan.bufferGap > 0 ? <div className="badge upcoming">Build {fmt(plan.bufferGap, { decimals: 0 })} more, e.g. from your next bonus payday</div> : <div className="badge done">✓ Buffer covered</div>}
             </div>
           </div>
           {bonus.length > 0 && (
             <>
               <h4 style={{ marginTop: 8 }}>🎁 Extra-payday months</h4>
-              <p className="muted sm">These months have one more payday than usual, but bills don't go up. Send the extra straight to your buffer or a goal.</p>
+              <p className="muted sm">One more payday, same bills: send the extra to your buffer or a goal.</p>
               <ul className="list compact">
                 {bonus.slice(0, 5).map((b) => <li key={b.key + b.name} className="list-row"><span className="grow">{b.label} · {b.name}</span><b className="pos">+{fmt(b.amount, { decimals: 0 })}</b></li>)}
               </ul>
@@ -258,7 +262,7 @@ function Pots({ plan, prof, go }) {
           <span className="muted sm">{owed.open} open{owed.overdue ? ` · ${owed.overdue} overdue` : ''}</span>
         </button>
       </div>
-      <p className="muted xs">Pulse can't see inside your bank's pots, so record moves here (or keep the balance in step in Settings). Bank-connected pots show under Bank Sync.</p>
+      <p className="muted xs">Record moves here; Pulse can't see inside your bank's pots.</p>
     </div>
   );
 }

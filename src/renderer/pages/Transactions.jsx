@@ -84,7 +84,9 @@ export default function Transactions({ go }) {
                     {cards.has(t.account) && <span className="src card-src" title={`On your ${cards.get(t.account).name} card`}>💳 {cards.get(t.account).name}</span>}
                     {cards.has(t.account) && t.amount < 0 && t.categoryId !== 'transfer' && (
                       <button className={`receipt-btn ${t.emiId ? 'done' : ''}`} onClick={() => setEmiTxn(t)} title={t.emiId ? 'Edit EMI plan' : 'Convert this purchase into monthly instalments'}>
-                        {t.emiId && plans.get(t.emiId) ? (() => { const st = emiStatus(plans.get(t.emiId), cards.get(t.account)); return `EMI ${st.billed}/${st.tenure}`; })() : 'Convert to EMI'}
+                        {t.emiId && plans.get(t.emiId)
+                          ? (plans.get(t.emiId).tenure === 1 ? 'Paid in full' : (() => { const st = emiStatus(plans.get(t.emiId), cards.get(t.account)); return `EMI ${st.billed}/${st.tenure}`; })())
+                          : cards.get(t.account).spread ? `Split ${cards.get(t.account).spread.months}× · change` : 'Convert to EMI'}
                       </button>
                     )}
                     {t.amount < 0 && ITEMISABLE[t.categoryId] && (

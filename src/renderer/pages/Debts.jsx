@@ -28,7 +28,7 @@ export default function Debts() {
   // EMI instalments are part of their card's bill, so they aren't added again.
   const minTotal = owed.filter((d) => !isCardEmi(d)).reduce((s, d) => s + (d.minPayment || 0), 0);
   // The payoff plan covers balances that carry interest: not cards you clear in full each month.
-  const debts = owed.filter((d) => !(isCardDebt(d) && (d.payMode || 'full') === 'full'));
+  const debts = owed.filter((d) => !(isCardDebt(d) && (d.payMode || 'full') === 'full') && !(isCardEmi(d) && d.tenure === 1));
   const tracked = view.debts.filter(isCardDebt);
   const manual = view.debts.filter((d) => !isCardDebt(d) && !isCardEmi(d));
   const plans = useMemo(() => ({
@@ -60,7 +60,7 @@ export default function Debts() {
               const raw = state.debts.find((x) => x.id === c.id);
               const openClose = nextClose(c, closeOnOrBefore(c, today));
               const soFar = statementFor(state, c, openClose);
-              const emis = view.debts.filter((d) => isCardEmi(d) && d.viaCard === c.id && !d.emi?.done);
+              const emis = view.debts.filter((d) => isCardEmi(d) && d.tenure > 1 && d.viaCard === c.id && !d.emi?.done);
               const used = c.creditLimit > 0 ? Math.min(1, c.balance / c.creditLimit) : null;
               return (
                 <div key={c.id} className="card debt">
@@ -74,17 +74,12 @@ export default function Debts() {
                     {used !== null && <span>{Math.round(used * 100)}% of {fmt(c.creditLimit, { decimals: 0 })} limit</span>}
                     {c.apr > 0 && <span className={c.apr >= 15 ? 'neg' : ''}>{c.apr}% APR</span>}
                   </div>
-                  {c.nextBill && (
-                    <div className="card-bill">
-                      <div><span className="muted sm">Next bill</span><b>{c.nextBill.estimated ? '≈ ' : ''}{fmt(c.nextBill.payment)}</b><small className="muted">due {c.nextBill.due}{c.nextBill.estimated ? ' · estimate until the statement is in' : ` · statement ${fmt(c.nextBill.total)}`}</small></div>
-                      <div><span className="muted sm">This cycle so far</span><b>{fmt(soFar.purchases - soFar.refunds)}</b><small className="muted">closes {openClose}{soFar.emi ? ` · + ${fmt(soFar.emi)} EMI` : ''}</small></div>
-                    </div>
-                  )}
+                  {c.nextBill && <CardBill card={c} bill={c.nextBill} soFar={soFar} openClose={openClose} />}
                   {emis.length > 0 && <div className="muted sm">EMI plans on this card: {emis.map((e) => e.name).join(', ')}</div>}
                 </div>
               );
             })}
-            {view.debts.filter(isCardEmi).map((e) => {
+            {view.debts.filter((d) => isCardEmi(d) && d.tenure > 1).map((e) => {
               const st = e.emi;
               const card = view.debts.find((d) => d.id === e.viaCard);
               const txn = state.transactions.find((t) => t.id === e.txnId);
@@ -176,5 +171,68 @@ export default function Debts() {
         <div className="form-actions"><button className="btn ghost danger" onClick={async () => { await dispatch({ type: 'debt/delete', payload: { id: editCard.id } }); setEditCard(null); }}>Stop tracking as a credit card</button></div></Modal>}
       {editEmi && <Modal title="EMI plan" onClose={() => setEditEmi(null)}><EmiForm txn={editEmi.txn} plan={editEmi.plan} onDone={() => setEditEmi(null)} /></Modal>}
     </div>
+  );
+}
+
+/** The next bill on a tracked card: amount, what it's made of, and a way to correct it. */
+function CardBill({ card, bill, soFar, openClose }) {
+  const { fmt, dispatch, notify } = useApp();
+  const [open, setOpen] = useState(false);
+  const [fix, setFix] = useState(false);
+  const [amount, setAmount] = useState('');
+  const key = `${card.id}:${bill.due}`;
+  const save = (e) => {
+    e.preventDefault();
+    const n = parseFloat(amount);
+    if (!(n >= 0)) return;
+    dispatch({ type: 'occ/override', payload: { key, amount: n } });
+    notify(`${card.name} bill set to ${fmt(n)}, due ${bill.due}`, 'good');
+    setFix(false);
+    setAmount('');
+  };
+  return (
+    <>
+      <div className="card-bill">
+        <div>
+          <span className="muted sm">Next bill{bill.entered ? ' (you entered it)' : ''}</span>
+          <b>{bill.estimated ? '≈ ' : ''}{fmt(bill.payment)}</b>
+          <small className="muted">due {bill.due}{bill.estimated ? ' · estimate until the statement is in' : ` · statement ${bill.start} to ${bill.close}`}</small>
+        </div>
+        <div>
+          <span className="muted sm">This cycle so far</span>
+          <b>{fmt(soFar.purchases + soFar.spread - soFar.refunds)}</b>
+          <small className="muted">closes {openClose}{soFar.emi ? ` · + ${fmt(soFar.emi)} EMI` : ''}</small>
+        </div>
+      </div>
+      {bill.historyGap && !bill.entered && (
+        <p className="callout warn sm">History starts {bill.historyFrom}, so this bill may miss older purchases. Enter the real amount if it differs.</p>
+      )}
+      <div className="inline-row wrap">
+        <button className="linkish sm" onClick={() => setOpen((x) => !x)}>{open ? '▾' : '▸'} What's in this bill</button>
+        {bill.entered
+          ? <button className="linkish sm" onClick={() => { dispatch({ type: 'occ/reset', payload: { key } }); notify(`Back to the calculated ${fmt(bill.calculated)}`, 'info'); }}>Use Pulse's figure ({fmt(bill.calculated)}) instead</button>
+          : <button className="linkish sm" onClick={() => setFix((x) => !x)}>Bill amount is different?</button>}
+      </div>
+      {fix && (
+        <form className="inline-row" onSubmit={save}>
+          <input type="number" step="0.01" min="0" inputMode="decimal" className="amount-sm" placeholder={bill.payment.toFixed(2)} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Real bill amount" autoFocus />
+          <button className="btn primary sm" disabled={amount === ''}>Save</button>
+          <span className="muted sm">from your card's app or statement</span>
+        </form>
+      )}
+      {open && (
+        <ul className="list compact bill-lines">
+          {bill.lines.length === 0 && <li className="muted sm">No card transactions in this bill.</li>}
+          {bill.lines.map((l, i) => (
+            <li key={i} className="list-row">
+              <span className="muted nowrap">{l.date}</span>
+              <span className="grow">{l.description}{l.kind === 'instalment' && <small className="muted"> · part {l.k} of {l.n} of a {fmt(l.original)} purchase</small>}{l.kind === 'emi' && <small className="muted"> · EMI {l.k} of {l.n}</small>}{l.kind === 'refund' && <small className="muted"> · refund</small>}</span>
+              <b className={l.amount < 0 ? 'pos' : ''}>{fmt(l.amount)}</b>
+            </li>
+          ))}
+          <li className="list-row"><span className="grow"><b>Total</b></span><b>{fmt(bill.calculated)}</b></li>
+        </ul>
+      )}
+    </>
   );
 }
