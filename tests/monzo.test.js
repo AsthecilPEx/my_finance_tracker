@@ -146,3 +146,26 @@ describe('Monzo connector', () => {
     expect(rows.map((r) => r.categoryId)).toEqual(['transfer', 'transfer']);
   });
 });
+
+describe('Bank copies of hand-entered purchases', () => {
+  it('links your own entry to the Monzo account instead of dropping the bank copy', async () => {
+    const { createEmptyState, reduce } = await import('../src/engine/state.js');
+    let s = createEmptyState();
+    s = reduce(s, { type: 'txn/add', payload: { date: '2026-09-30', amount: -14.32, description: 'Aldi', categoryId: 'groceries' } });
+    s = reduce(s, { type: 'txn/add', payload: { date: '2026-09-30', amount: -5, description: 'Coffee', account: 'Lloyds Current' } });
+    const lloyds = s.transactions.find((t) => t.description === 'Coffee');
+    s = reduce(s, { type: 'txn/import', payload: { source: 'monzo', rows: [
+      { date: '2026-09-30', amount: -14.32, description: 'ALDI', account: 'Monzo Flex', externalId: 'monzo:tx_1' },
+    ] } });
+    const aldi = s.transactions.filter((t) => Math.abs(t.amount) === 14.32);
+    expect(aldi).toHaveLength(1);
+    expect(aldi[0]).toMatchObject({ description: 'Aldi', categoryId: 'groceries', account: 'Monzo Flex', externalId: 'monzo:tx_1' });
+    // Synced again later: still one, nothing re-added.
+    s = reduce(s, { type: 'txn/import', payload: { source: 'monzo', rows: [{ date: '2026-09-30', amount: -14.32, description: 'ALDI', account: 'Monzo Flex', externalId: 'monzo:tx_1' }] } });
+    expect(s.transactions.filter((t) => Math.abs(t.amount) === 14.32)).toHaveLength(1);
+    // A different bank's purchase of the same amount is a different payment.
+    s = reduce(s, { type: 'txn/import', payload: { source: 'monzo', rows: [{ date: '2026-09-30', amount: -5, description: 'PRET', account: 'Monzo Flex', externalId: 'monzo:tx_2' }] } });
+    expect(s.transactions.find((t) => t.id === lloyds.id).account).toBe('Lloyds Current');
+    expect(s.transactions.find((t) => t.externalId === 'monzo:tx_2')).toMatchObject({ account: 'Monzo Flex', amount: -5 });
+  });
+});
