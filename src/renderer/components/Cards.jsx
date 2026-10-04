@@ -6,7 +6,7 @@ import { unclassifiedAccounts, cardDebts, closeOnOrBefore, nextClose, emiSchedul
 import { ordinal, todayISO } from '../../engine/dates.js';
 
 // Monzo Flex's options; you pick the one your app is set to.
-const FLEX_PLAN = { mode: 'full', freeMonths: 3, apr: 39, maxMonths: 24, minInstalment: 5 };
+const FLEX_PLAN = { mode: 'full', freeMonths: 3, apr: 39, maxMonths: 24, minInstalment: 5, options: [3, 6, 12, 24] };
 const PLAN_MODES = [
   { id: 'full', title: 'Each purchase in full on the next bill', sub: 'Normal credit cards · Flex "Pay in full"' },
   { id: 'choose', title: 'I choose for every purchase', sub: 'In full or 3, 6, 12 or 24 months · Flex "Choose for every purchase"' },
@@ -165,10 +165,12 @@ export function EmiForm({ txn, plan, onDone }) {
   return (
     <form onSubmit={submit} className="form">
       <p className="muted">{txn.description} on {txn.date} with {card.name}: <b>{fmt(Math.abs(txn.amount))}</b></p>
-      <div className="callout">
-        <p className="sm">Quick choice{planOf(card).mode !== 'full' ? ` (as on your ${card.name} app)` : ''}:</p>
-        <PlanChips card={card} txn={txn} current={plan} onDone={onDone} />
-      </div>
+      {planOf(card).mode !== 'full' && (
+        <div className="callout">
+          <p className="sm">{card.name}'s options:</p>
+          <PlanChips card={card} txn={txn} current={plan} onDone={onDone} />
+        </div>
+      )}
       <div className="row2">
         <Field label="Plan name"><input required value={f.name} onChange={set('name')} /></Field>
         <Field label="Amount converted to EMI"><input type="number" step="0.01" min="1" max={Math.abs(txn.amount)} required value={f.principal} onChange={set('principal')} /></Field>
@@ -259,6 +261,9 @@ function PlanPicker({ value, onChange }) {
           <Field label="Months per purchase"><input type="number" min="2" max="36" value={p.months} onChange={set('months')} /></Field>
           <Field label="Interest (APR %)"><input type="number" step="0.01" min="0" value={p.apr} onChange={set('apr')} /></Field>
         </div>
+      )}
+      {p.mode === 'choose' && (
+        <Field label="Plan lengths this card offers (months)" hint="Flex: 3, 6, 12, 24"><input value={Array.isArray(p.options) ? p.options.join(', ') : p.options ?? '3, 6, 12, 24'} onChange={set('options')} /></Field>
       )}
       {(p.mode === 'choose' || p.mode === 'minimum') && (
         <div className="row2">

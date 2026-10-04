@@ -181,7 +181,14 @@ function normalisePlan(plan, spread) {
     freeMonths: Math.max(0, Math.round(+(plan.freeMonths ?? 3))),
     maxMonths: Math.max(2, Math.round(+plan.maxMonths || 24)),
     minInstalment: Math.max(0, +(plan.minInstalment ?? 5)),
+    // The plan lengths this card offers per purchase (Flex: 3, 6, 12, 24).
+    options: parseOptions(plan.options),
   };
+}
+
+function parseOptions(v) {
+  const list = (Array.isArray(v) ? v : String(v ?? '').split(/[,\s]+/)).map((x) => Math.round(+x)).filter((x) => x >= 2 && x <= 60);
+  return list.length ? [...new Set(list)].sort((a, b) => a - b) : [3, 6, 12, 24];
 }
 
 const upsert = (list, item) => {

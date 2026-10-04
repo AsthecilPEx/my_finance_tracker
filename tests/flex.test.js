@@ -99,3 +99,29 @@ describe('Flex-style cards (every purchase split into monthly payments)', () => 
     });
   });
 });
+
+describe('Plan options follow each card’s own setting', () => {
+  const two = () => {
+    let s = createEmptyState();
+    s = reduce(s, { type: 'txn/import', payload: { source: 'csv', rows: [
+      { date: '2026-09-20', amount: -40, description: 'ASOS', account: 'Monzo Flex' },
+      { date: '2026-09-21', amount: -25, description: 'TESCO', account: 'Barclaycard' },
+    ] } });
+    s = reduce(s, { type: 'card/save', payload: { cardAccount: 'Monzo Flex', name: 'Monzo Flex', statementDay: 27, dueDay: 10, payMode: 'full', plan: { mode: 'choose', options: '3, 6, 12, 24' } } });
+    return reduce(s, { type: 'card/save', payload: { cardAccount: 'Barclaycard', name: 'Barclaycard', statementDay: 5, dueDay: 25, payMode: 'full', plan: { mode: 'full' } } });
+  };
+
+  it('only asks about purchases on cards set to "I choose"', () => {
+    const asked = purchasesAwaitingPlan(two(), '2026-09-25');
+    expect(asked.map((a) => a.txn.description)).toEqual(['ASOS']);
+  });
+
+  it('keeps each card’s own plan lengths', () => {
+    const s = two();
+    let c = s.debts.find((d) => d.cardAccount === 'Monzo Flex');
+    expect(c.plan.options).toEqual([3, 6, 12, 24]);
+    const s2 = reduce(s, { type: 'card/save', payload: { ...c, plan: { ...c.plan, options: '6 12' } } });
+    c = s2.debts.find((d) => d.cardAccount === 'Monzo Flex');
+    expect(c.plan.options).toEqual([6, 12]);
+  });
+});
