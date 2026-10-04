@@ -20,7 +20,7 @@ export default function Connect() {
       <MonzoConnect />
       <div className="card">
         <div className="card-head"><h3>📄 Statements: Lloyds, HSBC, Barclays, Revolut and others</h3><span className="muted sm">Pulse recognises each bank's file automatically</span></div>
-        <p className="muted">UK banks only share live data with regulated companies, so for these you download a statement (about 30 seconds) and Pulse does the rest: it reads the bank's format, skips anything already imported and reminds you when one is due.</p>
+        <p className="muted">Download a statement (about 30 seconds). Pulse reads it, skips duplicates and reminds you when one is due.</p>
         <WatchFolder />
         <CsvImport />
         <BankGuides />
@@ -125,18 +125,18 @@ function MonzoConnect() {
   return (
     <div className="card">
       <div className="card-head"><h3>🟠 Monzo: live sync</h3>{mz.connected && <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}>● {mz.needsReconnect ? 'Needs reconnecting' : mz.needsApproval ? 'Waiting for approval' : 'Connected'}</span>}</div>
-      <p className="muted">Uses Monzo's own free developer access for <b>your</b> accounts: current, joint and <b>Flex</b>. Read-only. Flex repayments are recognised as transfers, so nothing is counted twice.</p>
+      <p className="muted">Free, read-only live sync for your current, joint and Flex accounts.</p>
       {!isDesktop ? <DesktopOnly /> : mz.connected && mz.needsApproval ? (
         <div className="callout">
-          <p><b>📱 Open the Monzo app on your phone and approve "Pulse Finance".</b> Look for the notification, or the request at the top of the home screen.</p>
-          <p className="muted sm">Pulse checks automatically every few seconds. Approve within 5 minutes and your full history comes in; after that Monzo only allows the last 90 days.</p>
+          <p><b>📱 Approve "Pulse Finance" in the Monzo app on your phone.</b></p>
+          <ul className="tidy muted sm"><li>Pulse checks automatically.</li><li>Approve within 5 minutes to get your full history (otherwise 90 days).</li></ul>
           <div className="inline-row"><button className="btn primary" disabled={!!busy} onClick={() => run('check', async () => { const r = await api.monzo.checkApproval(); if (!r.approved) notify("Not approved yet. Check the Monzo app.", 'info'); else notify(`Monzo approved: ${r.added} transactions imported`, 'good'); })}>{busy === 'check' ? 'Checking…' : "I've approved it"}</button><button className="btn ghost" onClick={() => run('dc', () => api.monzo.disconnect())}>Cancel</button></div>
         </div>
       ) : mz.connected ? (
         <>
-          {mz.needsReconnect && <div className="callout warn"><p><b>Monzo needs you to approve Pulse again.</b> Monzo asks for this every 90 days. Click Reconnect, open the email link on this PC, then approve in the Monzo app.</p></div>}
+          {mz.needsReconnect && <div className="callout warn"><p><b>Monzo needs you to approve Pulse again</b> (every 90 days). Click Reconnect, open the email link on this PC, then approve in the app.</p></div>}
           <ul className="list">
-            {accounts.map((a) => <li key={a.id} className="list-row"><span aria-hidden>{a.kind === 'credit' ? '💳' : '🏦'}</span><span className="grow"><b>{a.name}</b>{a.kind === 'credit' && <small className="muted"> · amount owed, not counted as spendable money</small>}</span><b>{fmt(a.balance)}</b></li>)}
+            {accounts.map((a) => <li key={a.id} className="list-row"><span aria-hidden>{a.kind === 'credit' ? '💳' : '🏦'}</span><span className="grow"><b>{a.name}</b>{a.kind === 'credit' && <small className="muted"> · amount owed</small>}</span><b>{fmt(a.balance)}</b></li>)}
           </ul>
           <div className="inline-row wrap">
             <span className="muted grow">Last synced: {mz.lastSync ? new Date(mz.lastSync).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}{daysLeft !== null ? ` · re-approve in ${Math.max(0, daysLeft)} days` : ''}</span>
@@ -290,7 +290,7 @@ function WatchFolder() {
   return (
     <div className="sub-section">
       <div className="card-head"><h4>📂 Auto-import from a folder</h4>{watchEnabled && watchFolder && <span className="badge done">● Watching</span>}</div>
-      <p className="muted sm">Easiest: pick your <b>Downloads</b> folder. Whenever you download a bank statement CSV, Pulse imports it automatically, even while it's in the tray. Other CSV files are ignored.</p>
+      <p className="muted sm">Pick your <b>Downloads</b> folder and statements you download are imported automatically.</p>
       {!isDesktop ? <DesktopOnly /> : (
         <div className="inline-row">
           <input readOnly value={watchFolder || 'No folder chosen'} className="grow" />
@@ -345,10 +345,7 @@ function OpenBanking() {
   return (
     <div className="sub-section">
       <div className="card-head"><h4>🏦 Enable Banking</h4>{bank.connected && <span className={`badge ${bank.needsReconnect ? 'upcoming' : 'done'}`}>● {bank.needsReconnect ? 'Needs reconnecting' : 'Connected'}</span>}</div>
-      <p className="muted">
-        A regulated Open Banking provider. Free for personal use in "restricted" mode, which covers banks in the <b>EU/EEA only</b> (UK banks aren't offered).
-        Access is <b>read-only by law</b>. Your bank asks you to re-approve every 90–180 days, and Pulse syncs up to 4 times a day.
-      </p>
+      <p className="muted">Free, read-only Open Banking for <b>EU/EEA banks only</b> (not UK). Re-approve every 90–180 days.</p>
       {!isDesktop ? <DesktopOnly /> : bank.connected ? (
         <>
           <ul className="list">

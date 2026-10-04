@@ -205,10 +205,42 @@ await currysRow.getByRole('button', { name: 'Convert to EMI' }).click();
 await win.locator('.modal').getByRole('button', { name: 'Convert to EMI' }).click();
 await win.waitForTimeout(300);
 await nav('Debts & Loans');
-const emiCard = await win.locator('.card.debt', { hasText: 'EMI on Barclaycard' }).count();
+const emiCard = await win.locator('.card.debt .card-plans .list-row', { hasText: 'CURRYS' }).count();
 const cardCard = await win.locator('.card.debt', { hasText: 'Next bill' }).count();
 if (!emiCard || !cardCard) results.fail.push(`Debts page missing tracked card (${cardCard}) or EMI plan (${emiCard})`); else results.ok++;
+const cardBox = win.locator('.card.debt', { hasText: 'Next bill' }).first();
+await cardBox.getByRole('button', { name: /What's in this bill/ }).click();
+if (!(await cardBox.locator('.bill-lines .list-row').count())) results.fail.push('Card bill breakdown is empty'); else results.ok++;
+await cardBox.getByRole('button', { name: 'Bill amount is different?' }).click();
+await checkInputs('Card bill correction', '.card.debt');
+await cardBox.locator('input[aria-label="Real bill amount"]').fill('176.35');
+await cardBox.getByRole('button', { name: 'Save', exact: true }).click();
+await win.waitForTimeout(300);
+if (!(await cardBox.innerText()).includes('176.35')) results.fail.push('Entered card bill amount not shown'); else results.ok++;
+await cardBox.getByRole('button', { name: /Use Pulse's figure/ }).click();
 await win.getByLabel('Edit Barclaycard').click(); await checkInputs('Edit card', '.modal'); await closeModal();
+// Monzo Flex with "Choose for every purchase": the dashboard asks how each purchase is paid.
+await win.evaluate(() => window.pulse.dispatch({ type: 'txn/import', payload: { source: 'monzo', rows: [
+  { date: '2026-09-29', amount: -240, description: 'NIKE', account: 'Monzo Flex' },
+  { date: '2026-09-30', amount: -12.5, description: 'DELIVEROO', account: 'Monzo Flex' },
+] } }));
+await win.getByRole('dialog', { name: 'New account found' }).waitFor({ timeout: 5000 });
+await win.getByRole('button', { name: "Yes, it's a credit card" }).click();
+await win.locator('.modal input[placeholder="e.g. 28"]').fill('27');
+await win.locator('.modal input[placeholder="e.g. 20"]').fill('10');
+await win.locator('.modal .plan-opt', { hasText: 'I choose for every purchase' }).click();
+await checkInputs('Flex card setup (choose mode)', '.modal');
+await win.locator('.modal input[placeholder="e.g. 28"]').fill('27'); // checkInputs typed over the dates
+await win.locator('.modal input[placeholder="e.g. 20"]').fill('10');
+await win.locator('.modal').getByRole('button', { name: 'Save card' }).click();
+await nav('Dashboard');
+const nikeQ = win.locator('.review-item.card-plan', { hasText: 'NIKE' });
+await nikeQ.waitFor({ timeout: 3000 });
+await nikeQ.getByRole('button', { name: /^3 mo/ }).click();
+await win.waitForTimeout(300);
+if (await win.locator('.review-item.card-plan', { hasText: 'NIKE' }).count()) results.fail.push('Choosing a Flex plan did not clear the question'); else results.ok++;
+await nav('Debts & Loans');
+if (!(await win.locator('.card-plans .list-row', { hasText: 'NIKE' }).count())) results.fail.push('Flex plan missing on Debts'); else results.ok++;
 await nav('Settings');
 if (!(await win.locator('#accounts select[aria-label="Type of Barclaycard"]').count())) results.fail.push('Settings › accounts list missing the card'); else results.ok++;
 

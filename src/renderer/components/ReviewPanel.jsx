@@ -4,6 +4,7 @@ import { reviewQueue } from '../../engine/review.js';
 import { openSplits } from '../../engine/split.js';
 import { CategorySelect } from './Forms.jsx';
 import { SettleModal } from './Split.jsx';
+import { PlanChips } from './Cards.jsx';
 
 /** Dashboard panel: questions about your transactions that only you can answer. */
 export default function ReviewPanel() {
@@ -50,6 +51,7 @@ export default function ReviewPanel() {
                   )}
                   {it.kind === 'split-overdue' && <SplitOverdueActions it={it} />}
                   {it.kind === 'bill-amount' && <BillAmount it={it} />}
+                  {it.kind === 'card-plan' && <PlanChips card={state.debts.find((d) => d.id === it.cardId)} txn={byId(it.txnIds[0])} />}
                   <button className="linkish muted sm" onClick={() => later(it.key)}>Not now</button>
                 </div>
               </div>

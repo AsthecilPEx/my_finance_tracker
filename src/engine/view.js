@@ -41,7 +41,8 @@ export function financialView(state) {
       return d;
     });
     // An EMI'd purchase isn't one big spend: each billed instalment counts in its own month instead.
-    const plans = view.debts.filter(isCardEmi);
+    // (A one-month plan just means "pay this one in full": its spending stays on the purchase date.)
+    const plans = view.debts.filter((d) => isCardEmi(d) && (d.tenure || 1) > 1);
     const byTxn = new Map(plans.map((p) => [p.txnId, p]));
     const extra = [];
     view.transactions = view.transactions.map((t) => (t.emiId && byTxn.has(t.id) ? { ...t, categoryId: 'transfer', emiConverted: true } : t));

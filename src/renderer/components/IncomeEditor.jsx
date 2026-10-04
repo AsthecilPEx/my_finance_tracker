@@ -67,7 +67,7 @@ export default function IncomeEditor({ value, onChange, region = 'ruk' }) {
 
         <label className="check">
           <input type="checkbox" checked={!!inc.variable} onChange={(e) => set({ variable: e.target.checked })} />
-          <span><b>My pay changes each time</b> (shifts, overtime, commission, gig work). Pulse will plan on your <i>lowest</i> typical pay so you're never caught short.</span>
+          <span><b>My pay changes each time</b> (shifts, overtime, gig work). Pulse plans on your <i>lowest</i> typical pay.</span>
         </label>
         {inc.variable && <Field label="Lowest take-home per payment in a normal month"><input type="number" min="0" step="0.01" value={inc.lowestNet} onChange={(e) => set({ lowestNet: e.target.value })} /></Field>}
 

@@ -8,7 +8,7 @@ import { ITEMISABLE } from '../../engine/receipts.js';
 import { SplitModal, SettleModal } from '../components/Split.jsx';
 import { myAmount, openSplits } from '../../engine/split.js';
 import { formatMoney } from '../../engine/money.js';
-import { cardDebts, emiStatus } from '../../engine/cards.js';
+import { cardDebts, emiStatus, planOf } from '../../engine/cards.js';
 import { EmiForm } from '../components/Cards.jsx';
 
 const PAGE = 100;
@@ -84,7 +84,9 @@ export default function Transactions({ go }) {
                     {cards.has(t.account) && <span className="src card-src" title={`On your ${cards.get(t.account).name} card`}>💳 {cards.get(t.account).name}</span>}
                     {cards.has(t.account) && t.amount < 0 && t.categoryId !== 'transfer' && (
                       <button className={`receipt-btn ${t.emiId ? 'done' : ''}`} onClick={() => setEmiTxn(t)} title={t.emiId ? 'Edit EMI plan' : 'Convert this purchase into monthly instalments'}>
-                        {t.emiId && plans.get(t.emiId) ? (() => { const st = emiStatus(plans.get(t.emiId), cards.get(t.account)); return `EMI ${st.billed}/${st.tenure}`; })() : 'Convert to EMI'}
+                        {t.emiId && plans.get(t.emiId)
+                          ? (plans.get(t.emiId).tenure === 1 ? 'Paid in full' : (() => { const st = emiStatus(plans.get(t.emiId), cards.get(t.account)); return `EMI ${st.billed}/${st.tenure}`; })())
+                          : (() => { const pl = planOf(cards.get(t.account)); return pl.mode === 'choose' ? 'Choose plan' : pl.mode === 'split' ? `${pl.months} months · change` : pl.mode === 'minimum' ? 'Minimum plan · change' : 'Convert to EMI'; })()}
                       </button>
                     )}
                     {t.amount < 0 && ITEMISABLE[t.categoryId] && (

@@ -74,7 +74,7 @@ export default function Onboarding() {
         {step === 0 && (
           <>
             <h1>Hello! Let's make money feel simple.</h1>
-            <p className="muted">Pulse builds your calendar around <b>your</b> paydays, whether you're paid monthly, weekly, every other Friday or whenever the work comes in. It takes about two minutes. Everything stays on this computer.</p>
+            <p className="muted">A plan built around <b>your</b> paydays. Takes about two minutes.</p>
             <Field label="What should we call you?"><input autoFocus value={me.name} onChange={(e) => setMe({ ...me, name: e.target.value })} placeholder="Your first name" /></Field>
             <div className="row2">
               <Field label="Where do you pay tax?">
@@ -90,7 +90,7 @@ export default function Onboarding() {
                 </select>
               </Field>
             </div>
-            <p className="privacy-note">🔒 <b>Private by design.</b> No account, no cloud. Your finances are stored only on this computer. Pulse goes online only for exchange rates, updates and (if you choose) a read-only bank connection.</p>
+            <p className="privacy-note">🔒 <b>Private by design.</b> No account, no cloud: your data stays on this computer.</p>
             <div className="onboard-actions">
               <button className="btn ghost" onClick={demo}>Just explore with demo data</button>
               <button className="btn primary" onClick={() => setStep(1)}>Let's go →</button>
@@ -119,7 +119,7 @@ export default function Onboarding() {
         {step === 2 && (
           <>
             <h2>Your regular bills</h2>
-            <p className="muted">Tick what you pay and roughly how much. They'll show on your calendar and Pulse will make sure each payday sets enough aside. Skip anything you're unsure of.</p>
+            <p className="muted">Tick what you pay and roughly how much. Skip anything you're unsure of.</p>
             <div className="preset-list">
               {BILL_PRESETS.map((p) => {
                 const b = bills[p.key] || { on: false, amount: '', day: p.day };
@@ -153,7 +153,7 @@ export default function Onboarding() {
               <input type="checkbox" checked={pot} onChange={(e) => setPot(e.target.checked)} />
               <div>
                 <b>🪣 Use a bills pot</b>
-                <p className="muted">Most bills are monthly, but pay often isn't. Each payday, Pulse tells you exactly how much to move into a separate "bills" pot or account, so rent week never catches you out. It's worked out from your pay pattern, so bigger paydays put in more.</p>
+                <p className="muted">Each payday, Pulse tells you how much to set aside for bills.</p>
               </div>
             </label>
             <div className="card inset">
@@ -183,7 +183,7 @@ export default function Onboarding() {
             <ul className="list compact">
               {prof.sources.map((s) => <li key={s.inc.id} className="list-row"><span className="grow">💼 {s.inc.name} · <span className="muted">{describeSchedule(s.inc.schedule)}</span></span><b>{fmt(s.plannedPerPay)}</b></li>)}
             </ul>
-            {pot && plan.billsShare > 0 && <p className="muted">🪣 Each payday, move <b>{Math.round(plan.billsShare * 100)}%</b> of it into your bills pot{plan.startingBuffer > 0 ? <> and start with a buffer of about <b>{fmt(plan.startingBuffer, { decimals: 0 })}</b> to cover any bills that land before the pot has built up</> : ''}.</p>}
+            {pot && plan.billsShare > 0 && <p className="muted">🪣 Move <b>{Math.round(plan.billsShare * 100)}%</b> of each payday to your bills pot{plan.startingBuffer > 0 ? <>, starting with about <b>{fmt(plan.startingBuffer, { decimals: 0 })}</b></> : ''}.</p>}
             {prof.monthly > 0 && plan.commitmentsMonthly + plan.goalsMonthly > prof.monthly && <p className="error">⚠ Your bills and goals are more than your take-home. The Pay Planner and Insights pages will help you find room.</p>}
             <div className="onboard-actions">
               <button className="btn ghost" onClick={() => setStep(3)}>← Back</button>

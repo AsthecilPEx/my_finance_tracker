@@ -27,7 +27,7 @@ export default function Budgets() {
   return (
     <div className="page">
       <header className="page-head">
-        <div><h1>Budgets & Caps</h1><p className="muted">Caps warn you as you get close. Budgets drive the category meters; categories without one are measured against your 3-month average.</p></div>
+        <div><h1>Budgets & Caps</h1><p className="muted">Caps warn you before you overspend. Budgets set the category meters.</p></div>
         <button className="btn ghost" onClick={useAverages}>Fill empty budgets from averages</button>
       </header>
       <div className="card"><CapList /></div>

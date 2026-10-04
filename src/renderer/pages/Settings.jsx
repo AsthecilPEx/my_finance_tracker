@@ -99,7 +99,7 @@ export default function Settings() {
 
       <div className="card" id="accounts">
         <h3>🏦 Your accounts</h3>
-        <p className="muted">Accounts found in your imports and bank sync. Mark credit cards so Pulse works out their bills from their transactions and doesn't count paying them as spending.</p>
+        <p className="muted">Mark credit cards so Pulse works out their bills.</p>
         <AccountsList />
       </div>
 
@@ -178,7 +178,7 @@ function Currencies() {
         {isDesktop && <button className="btn ghost sm" disabled={busy} onClick={refresh}>{busy ? 'Updating…' : 'Update now'}</button>}
       </div>
       <p className="muted sm">
-        Bills, debts and EMIs can be in any currency (choose it when adding them). Pulse downloads daily reference rates each time it runs, then re-converts every total, forecast and insight so you can see small exchange-rate changes in what things really cost you.
+        Bills, debts and EMIs can be in any currency. Rates update daily and every total follows them.
         {fx?.date ? ` Rates from ${fx.date}${fx.source ? ` (${fx.source})` : ''}.` : ' No rates downloaded yet.'}
       </p>
       {list.length > 0 && (

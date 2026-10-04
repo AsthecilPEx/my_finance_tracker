@@ -170,6 +170,27 @@ function foreignRow(state, row) {
   return { ...row, amount: toBase(row.amount, row.currency, state), original: { amount: row.amount, currency: row.currency, rate: rate || null } };
 }
 
+function normalisePlan(plan, spread) {
+  if (!plan?.mode && spread && +spread.months > 1) plan = { mode: 'split', months: spread.months, apr: spread.apr };
+  if (!plan?.mode) return { mode: 'full' };
+  const mode = ['full', 'choose', 'split', 'minimum'].includes(plan.mode) ? plan.mode : 'full';
+  return {
+    mode,
+    months: Math.max(2, Math.round(+plan.months || 3)),
+    apr: +plan.apr || 0,
+    freeMonths: Math.max(0, Math.round(+(plan.freeMonths ?? 3))),
+    maxMonths: Math.max(2, Math.round(+plan.maxMonths || 24)),
+    minInstalment: Math.max(0, +(plan.minInstalment ?? 5)),
+    // The plan lengths this card offers per purchase (Flex: 3, 6, 12, 24).
+    options: parseOptions(plan.options),
+  };
+}
+
+function parseOptions(v) {
+  const list = (Array.isArray(v) ? v : String(v ?? '').split(/[,\s]+/)).map((x) => Math.round(+x)).filter((x) => x >= 2 && x <= 60);
+  return list.length ? [...new Set(list)].sort((a, b) => a - b) : [3, 6, 12, 24];
+}
+
 const upsert = (list, item) => {
   const i = list.findIndex((x) => x.id === item.id);
   if (i === -1) return [...list, { ...item, id: item.id || newId() }];
@@ -255,6 +276,9 @@ export function reduce(state, action) {
         creditLimit: +p.creditLimit || 0,
         match: String(p.match || p.name || '').toLowerCase().trim(),
         flipSign: !!p.flipSign,
+        // How purchases become bill lines (Monzo Flex's options): full / choose / split / minimum.
+        plan: normalisePlan(p.plan, p.spread),
+        spread: undefined,
         balance: 0,
       };
       const flip = !!prev?.flipSign !== card.flipSign;

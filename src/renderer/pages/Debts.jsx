@@ -28,7 +28,7 @@ export default function Debts() {
   // EMI instalments are part of their card's bill, so they aren't added again.
   const minTotal = owed.filter((d) => !isCardEmi(d)).reduce((s, d) => s + (d.minPayment || 0), 0);
   // The payoff plan covers balances that carry interest: not cards you clear in full each month.
-  const debts = owed.filter((d) => !(isCardDebt(d) && (d.payMode || 'full') === 'full'));
+  const debts = owed.filter((d) => !(isCardDebt(d) && (d.payMode || 'full') === 'full') && !(isCardEmi(d) && d.tenure === 1));
   const tracked = view.debts.filter(isCardDebt);
   const manual = view.debts.filter((d) => !isCardDebt(d) && !isCardEmi(d));
   const plans = useMemo(() => ({
@@ -60,7 +60,7 @@ export default function Debts() {
               const raw = state.debts.find((x) => x.id === c.id);
               const openClose = nextClose(c, closeOnOrBefore(c, today));
               const soFar = statementFor(state, c, openClose);
-              const emis = view.debts.filter((d) => isCardEmi(d) && d.viaCard === c.id && !d.emi?.done);
+              const emis = view.debts.filter((d) => isCardEmi(d) && d.tenure > 1 && d.viaCard === c.id && !d.emi?.done);
               const used = c.creditLimit > 0 ? Math.min(1, c.balance / c.creditLimit) : null;
               return (
                 <div key={c.id} className="card debt">
@@ -68,41 +68,36 @@ export default function Debts() {
                     <div><h3>{c.name}</h3><span className="muted sm">Statement on the {ordinal(c.statementDay)} · due the {ordinal(c.dueDay)} · {c.payMode === 'minimum' ? 'pays the minimum' : c.payMode === 'fixed' ? `pays ${fmt(c.fixedPayment)}` : 'paid in full'}</span></div>
                     <div className="row-actions"><button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setEditCard(raw)}>✎</button></div>
                   </div>
-                  <div className="debt-bal">{fmt(c.balance, { decimals: 0 })}<small className="muted"> owed</small></div>
+                  {(() => { const onPlans = emis.reduce((t, e) => t + (e.emi?.remaining || 0), 0); return (
+                    <div className="debt-bal">{fmt(c.balance + onPlans, { decimals: 0 })}<small className="muted"> owed{onPlans > 0 ? ` · ${fmt(onPlans, { decimals: 0 })} on plans` : ''}</small></div>
+                  ); })()}
                   {used !== null && <div className="progress" aria-label={`${Math.round(used * 100)}% of limit used`}><span style={{ width: `${used * 100}%` }} /></div>}
                   <div className="debt-meta">
                     {used !== null && <span>{Math.round(used * 100)}% of {fmt(c.creditLimit, { decimals: 0 })} limit</span>}
                     {c.apr > 0 && <span className={c.apr >= 15 ? 'neg' : ''}>{c.apr}% APR</span>}
                   </div>
-                  {c.nextBill && (
-                    <div className="card-bill">
-                      <div><span className="muted sm">Next bill</span><b>{c.nextBill.estimated ? '≈ ' : ''}{fmt(c.nextBill.payment)}</b><small className="muted">due {c.nextBill.due}{c.nextBill.estimated ? ' · estimate until the statement is in' : ` · statement ${fmt(c.nextBill.total)}`}</small></div>
-                      <div><span className="muted sm">This cycle so far</span><b>{fmt(soFar.purchases - soFar.refunds)}</b><small className="muted">closes {openClose}{soFar.emi ? ` · + ${fmt(soFar.emi)} EMI` : ''}</small></div>
+                  {c.nextBill && <CardBill card={c} bill={c.nextBill} soFar={soFar} openClose={openClose} />}
+                  {emis.length > 0 && (
+                    <div className="card-plans">
+                      <div className="muted sm">Plans on this card</div>
+                      <ul className="list compact">
+                        {emis.map((e) => {
+                          const st = e.emi;
+                          const txn = state.transactions.find((t) => t.id === e.txnId);
+                          return (
+                            <li key={e.id} className="list-row">
+                              <span className="grow"><b>{e.name}</b><small className="muted"> · {st.billed}/{st.tenure} paid{e.apr ? ` · ${e.apr}%` : ' · 0%'}</small>
+                                <div className="progress thin"><span style={{ width: `${(st.billed / st.tenure) * 100}%` }} /></div>
+                              </span>
+                              <span className="muted sm nowrap">{fmt(st.instalment)}/mo</span>
+                              <b className="nowrap">{fmt(st.remaining, { decimals: 0 })} left</b>
+                              {txn && <button className="icon-btn" aria-label={`Edit ${e.name}`} onClick={() => setEditEmi({ txn, plan: state.debts.find((x) => x.id === e.id) })}>✎</button>}
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </div>
                   )}
-                  {emis.length > 0 && <div className="muted sm">EMI plans on this card: {emis.map((e) => e.name).join(', ')}</div>}
-                </div>
-              );
-            })}
-            {view.debts.filter(isCardEmi).map((e) => {
-              const st = e.emi;
-              const card = view.debts.find((d) => d.id === e.viaCard);
-              const txn = state.transactions.find((t) => t.id === e.txnId);
-              const raw = state.debts.find((x) => x.id === e.id);
-              return (
-                <div key={e.id} className={`card debt ${st.done ? 'inactive' : ''}`}>
-                  <div className="card-head">
-                    <div><h3>{e.name}</h3><span className="muted sm">EMI on {card?.name} · {st.tenure} months{e.apr ? ` at ${e.apr}%` : ' · interest-free'}</span></div>
-                    <div className="row-actions">{txn && <button className="icon-btn" aria-label={`Edit ${e.name}`} onClick={() => setEditEmi({ txn, plan: raw })}>✎</button>}</div>
-                  </div>
-                  <div className="debt-bal">{fmt(st.remaining, { decimals: 0 })}<small className="muted"> left</small></div>
-                  <div className="progress" aria-label={`${st.billed} of ${st.tenure} instalments`}><span style={{ width: `${(st.billed / st.tenure) * 100}%` }} /></div>
-                  <div className="debt-meta">
-                    <span>{st.billed} of {st.tenure} paid</span>
-                    <span>{fmt(st.instalment)}/mo on the card bill</span>
-                    {st.totalInterest > 0 && <span className="neg">{fmt(st.totalInterest)} interest</span>}
-                  </div>
-                  <div className="muted sm">{st.done ? 'Finished' : st.next ? `Next instalment on the ${st.next.date} statement` : ''}</div>
                 </div>
               );
             })}
@@ -176,5 +171,68 @@ export default function Debts() {
         <div className="form-actions"><button className="btn ghost danger" onClick={async () => { await dispatch({ type: 'debt/delete', payload: { id: editCard.id } }); setEditCard(null); }}>Stop tracking as a credit card</button></div></Modal>}
       {editEmi && <Modal title="EMI plan" onClose={() => setEditEmi(null)}><EmiForm txn={editEmi.txn} plan={editEmi.plan} onDone={() => setEditEmi(null)} /></Modal>}
     </div>
+  );
+}
+
+/** The next bill on a tracked card: amount, what it's made of, and a way to correct it. */
+function CardBill({ card, bill, soFar, openClose }) {
+  const { fmt, dispatch, notify } = useApp();
+  const [open, setOpen] = useState(false);
+  const [fix, setFix] = useState(false);
+  const [amount, setAmount] = useState('');
+  const key = `${card.id}:${bill.due}`;
+  const save = (e) => {
+    e.preventDefault();
+    const n = parseFloat(amount);
+    if (!(n >= 0)) return;
+    dispatch({ type: 'occ/override', payload: { key, amount: n } });
+    notify(`${card.name} bill set to ${fmt(n)}, due ${bill.due}`, 'good');
+    setFix(false);
+    setAmount('');
+  };
+  return (
+    <>
+      <div className="card-bill">
+        <div>
+          <span className="muted sm">Next bill{bill.entered ? ' (you entered it)' : ''}</span>
+          <b>{bill.estimated ? '≈ ' : ''}{fmt(bill.payment)}</b>
+          <small className="muted">due {bill.due}{bill.estimated ? ' · estimate until the statement is in' : ` · statement ${bill.start} to ${bill.close}`}</small>
+        </div>
+        <div>
+          <span className="muted sm">This cycle so far</span>
+          <b>{fmt(soFar.total)}</b>
+          <small className="muted">closes {openClose}{soFar.emi ? ` · incl. ${fmt(soFar.emi)} plan payments` : ''}</small>
+        </div>
+      </div>
+      {bill.historyGap && !bill.entered && (
+        <p className="callout warn sm">History starts {bill.historyFrom}, so this bill may miss older purchases. Enter the real amount if it differs.</p>
+      )}
+      <div className="inline-row wrap">
+        <button className="linkish sm" onClick={() => setOpen((x) => !x)}>{open ? '▾' : '▸'} What's in this bill</button>
+        {bill.entered
+          ? <button className="linkish sm" onClick={() => { dispatch({ type: 'occ/reset', payload: { key } }); notify(`Back to the calculated ${fmt(bill.calculated)}`, 'info'); }}>Use Pulse's figure ({fmt(bill.calculated)}) instead</button>
+          : <button className="linkish sm" onClick={() => setFix((x) => !x)}>Bill amount is different?</button>}
+      </div>
+      {fix && (
+        <form className="inline-row" onSubmit={save}>
+          <input type="number" step="0.01" min="0" inputMode="decimal" className="amount-sm" placeholder={bill.payment.toFixed(2)} value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Real bill amount" autoFocus />
+          <button className="btn primary sm" disabled={amount === ''}>Save</button>
+          <span className="muted sm">from your card's app or statement</span>
+        </form>
+      )}
+      {open && (
+        <ul className="list compact bill-lines">
+          {bill.lines.length === 0 && <li className="muted sm">No card transactions in this bill.</li>}
+          {bill.lines.map((l, i) => (
+            <li key={i} className="list-row">
+              <span className="muted nowrap">{l.date}</span>
+              <span className="grow">{l.description}{l.kind === 'instalment' && <small className="muted"> · part {l.k} of {l.n} of a {fmt(l.original)} purchase</small>}{l.kind === 'emi' && <small className="muted"> · EMI {l.k} of {l.n}</small>}{l.kind === 'refund' && <small className="muted"> · refund</small>}</span>
+              <b className={l.amount < 0 ? 'pos' : ''}>{fmt(l.amount)}</b>
+            </li>
+          ))}
+          <li className="list-row"><span className="grow"><b>Total</b></span><b>{fmt(bill.calculated)}</b></li>
+        </ul>
+      )}
+    </>
   );
 }
