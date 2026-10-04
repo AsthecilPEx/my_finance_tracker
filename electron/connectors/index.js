@@ -12,3 +12,4 @@
 // Connectors are read-only by design. Anything that could move money (trading, SIP/SWP
 // execution) must be a separate, explicitly-confirmed capability.
 export { EnableBankingConnector } from './enablebanking.js';
+export { MonzoConnector } from './monzo.js';

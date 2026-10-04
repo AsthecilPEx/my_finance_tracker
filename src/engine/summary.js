@@ -1,10 +1,11 @@
 import { addDays, daysBetween, daysInMonth, lastMonths, monthEnd, monthStart, parseISO, toISO } from './dates.js';
-import { occurrencesBetween, matchOccurrences, nextOccurrence } from './recurring.js';
+import { occurrencesBetween, matchOccurrences, nextOccurrence, estimateAmount } from './recurring.js';
 import { categoryMap, SPENDING_TYPES } from './categories.js';
 import { round2, sum } from './money.js';
 import { monthlyInterest } from './debt.js';
 import { incomeItems } from './income.js';
 import { financialView } from './view.js';
+import { isCardDebt, isCardEmi, closesBetween, dueAfter, cardBill } from './cards.js';
 
 /** Recurring bills plus paydays generated from the pay profile. */
 export function scheduleItems(state) {
@@ -33,13 +34,18 @@ export function buildOccurrences(state, from, to) {
       occ.scheduledDate = occ.date;
       occ.scheduledAmount = occ.amount;
       if (o.date) occ.date = o.date;
-      if (typeof o.amount === 'number' && isFinite(o.amount)) occ.amount = occ.amount < 0 ? -Math.abs(o.amount) : Math.abs(o.amount);
+      if (typeof o.amount === 'number' && isFinite(o.amount)) {
+        occ.amount = occ.amount < 0 ? -Math.abs(o.amount) : Math.abs(o.amount);
+        occ.estimated = false; // the real bill amount has been entered
+      }
       occ.override = o;
     }
     if (occ.date >= from && occ.date <= to) out.push(occ);
   };
   for (const r of scheduleItems(state)) {
     if (r.active === false) continue;
+    // Usage-based bills plan on the average of their last few real payments.
+    const amount = r.variable ? estimateAmount(r, state.transactions, { outgoing: r.direction !== 'in' }) : Math.abs(r.amount);
     for (const date of occurrencesBetween(r, lo, hi, holidays)) {
       emit({
         key: `${r.id}:${date}`,
@@ -49,15 +55,43 @@ export function buildOccurrences(state, from, to) {
         type: r.direction === 'in' ? (r.kind === 'salary' ? 'payday' : 'income') : KIND_TO_TYPE[r.kind] || 'bill',
         date,
         name: r.name,
-        amount: r.direction === 'in' ? Math.abs(r.amount) : -Math.abs(r.amount),
+        amount: r.direction === 'in' ? amount : -amount,
         categoryId: r.categoryId,
         compulsory: r.direction === 'out' && !!r.compulsory,
         match: r.match,
+        ...(r.variable ? { variable: true, estimated: true } : {}),
+      });
+    }
+  }
+  // Tracked credit cards: one bill per statement, worked out from the card's own transactions.
+  // EMI plans are paid through the card bill, so they have no payments of their own.
+  for (const d of (state.debts || []).filter(isCardDebt)) {
+    for (const close of closesBetween(d, addDays(lo, -45), hi)) {
+      const due = dueAfter(d, close);
+      if (due < lo || due > hi) continue;
+      const bill = cardBill(state, d, close);
+      if (bill.payment <= 0) continue; // nothing on the card that month
+      emit({
+        key: `${d.id}:${due}`,
+        sourceId: d.id,
+        source: 'debt',
+        type: 'debt',
+        date: due,
+        name: `${d.name} bill`,
+        amount: -bill.payment,
+        categoryId: 'debt',
+        compulsory: true,
+        match: d.match || d.name,
+        cardBill: true,
+        statementDate: close,
+        statementTotal: bill.total,
+        estimated: bill.estimated,
       });
     }
   }
   for (const d of state.debts || []) {
-    if (!(d.balance > 0) || !(d.minPayment > 0) || !d.dueDay) continue;
+    const pay = debtPayment(d, state.transactions);
+    if (!pay || !d.dueDay) continue;
     const item = { frequency: 'monthly', dayOfMonth: d.dueDay, startDate: d.startDate || '2000-01-01', adjust: 'none' };
     for (const date of occurrencesBetween(item, lo, hi, holidays)) {
       emit({
@@ -67,14 +101,35 @@ export function buildOccurrences(state, from, to) {
         type: 'debt',
         date,
         name: d.name,
-        amount: -Math.abs(d.minPayment),
+        amount: -pay.amount,
         categoryId: 'debt',
         compulsory: true,
         match: d.match || d.lender || d.name,
+        ...(pay.variable ? { variable: true, estimated: true } : {}),
+        ...(d.statementDay ? { statementDay: d.statementDay } : {}),
       });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.amount - b.amount);
+}
+
+/**
+ * What a debt's monthly payment is expected to be, from how you pay it:
+ *  - minimum (default): the minimum payment, while there's a balance
+ *  - fixed: a set amount each month
+ *  - full: the whole statement balance. It changes every month, so it's estimated from your last
+ *    few card payments (or the balance) until you enter the statement amount.
+ */
+export function debtPayment(d, transactions = []) {
+  if (isCardDebt(d) || isCardEmi(d)) return null; // tracked cards: see cards.js
+  const mode = d.payMode || 'minimum';
+  if (mode === 'full') {
+    const amount = estimateAmount({ ...d, match: d.match || d.lender || d.name, amount: d.balance || d.minPayment || 0 }, transactions);
+    return { amount, variable: true };
+  }
+  if (!(d.balance > 0)) return null;
+  if (mode === 'fixed' && d.fixedPayment > 0) return { amount: Math.abs(d.fixedPayment), variable: false };
+  return d.minPayment > 0 ? { amount: Math.abs(d.minPayment), variable: false } : null;
 }
 
 /** Net spend per category per month: { 'YYYY-MM': { catId: amount } } (positive = money out). */
@@ -109,8 +164,9 @@ export function monthSummary(state, year, month, today) {
   const incomeActual = sum(txns.filter((t) => typeOf(t) === 'income' && t.amount > 0), (t) => t.amount);
   const unmatched = occurrences.filter((o) => !o.matchedTxnId);
   const incomeExpected = sum(unmatched.filter((o) => o.amount > 0), (o) => o.amount);
-  const committedPending = sum(unmatched.filter((o) => o.amount < 0), (o) => -o.amount);
-  const committedUpcoming = sum(unmatched.filter((o) => o.amount < 0 && o.status === 'upcoming'), (o) => -o.amount);
+  // A tracked card's bill pays for purchases already counted as spending, so it isn't committed again.
+  const committedPending = sum(unmatched.filter((o) => o.amount < 0 && !o.cardBill), (o) => -o.amount);
+  const committedUpcoming = sum(unmatched.filter((o) => o.amount < 0 && !o.cardBill && o.status === 'upcoming'), (o) => -o.amount);
 
   const totals = categoryTotalsByMonth(txns)[from.slice(0, 7)] || {};
   const spent = sum(Object.entries(totals).filter(([id]) => isSpendingCategory(cats[id])), ([, v]) => v);
@@ -127,7 +183,7 @@ export function monthSummary(state, year, month, today) {
     .filter((c) => SPENDING_TYPES.has(c.type) || c.type === 'savings')
     .map((c) => {
       const catSpent = Math.max(0, totals[c.id] || 0);
-      const pending = sum(unmatched.filter((o) => o.amount < 0 && o.categoryId === c.id), (o) => -o.amount);
+      const pending = sum(unmatched.filter((o) => o.amount < 0 && !o.cardBill && o.categoryId === c.id), (o) => -o.amount);
       const avg3 = sum(prev, (m) => Math.max(0, m[c.id] || 0)) / monthsWithData;
       const target = c.budget > 0 ? c.budget : avg3;
       return {
@@ -167,7 +223,8 @@ export function monthSummary(state, year, month, today) {
   const isCurrent = today >= from && today <= to;
   let safePerDay = null;
   let safeBasis = null;
-  const balances = (state.accounts || []).filter((a) => typeof a.balance === 'number');
+  // Spendable money only: credit cards / Flex balances are debts, not cash.
+  const balances = (state.accounts || []).filter((a) => typeof a.balance === 'number' && a.kind !== 'credit');
   if (isCurrent) {
     if (balances.length && nextPayday) {
       // Live bank balance: what's in the account minus bills due before the next payday.

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex">
+<title>Pulse Finance – finishing bank connection</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b0b0f; color: #f4f4f6; font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 34rem; padding: 24px 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 .5rem; }
+  p { color: #b8b8c4; }
+  code { display: block; word-break: break-all; background: #17171f; padding: 10px; border-radius: 8px; font-size: .8rem; color: #f4f4f6; }
+  button { margin-top: 10px; background: #7c5cff; color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font: inherit; cursor: pointer; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Handing you back to Pulse…</h1>
+  <p id="msg">Your bank approved the connection. Pulse on this computer is finishing it now.</p>
+  <div id="manual" class="hidden">
+    <p>If Pulse didn't say it's connected, copy this address and paste it into <b>Pulse → Bank Sync</b>, under "Stuck on a page after approving?":</p>
+    <code id="addr"></code>
+    <button id="copy" type="button">Copy address</button>
+  </div>
+</main>
+<script>
+  // Enable Banking only allows https:// redirects for production apps. This static page forwards the
+  // bank's reply to Pulse, which listens on this computer only (localhost). Nothing is stored or sent
+  // anywhere else, and the one-time code is useless without the user's own private key.
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var fwd = new URLSearchParams();
+    ['code', 'state', 'error', 'error_description'].forEach(function (k) { if (params.has(k)) fwd.set(k, params.get(k)); });
+    var addr = document.getElementById('addr');
+    var manual = document.getElementById('manual');
+    if (!fwd.has('code') && !fwd.has('error')) {
+      document.getElementById('title').textContent = 'Pulse Finance';
+      document.getElementById('msg').textContent = 'This page finishes connecting your bank to Pulse. Start from Bank Sync in the app.';
+      return;
+    }
+    if (fwd.has('error')) {
+      document.getElementById('title').textContent = 'The bank connection was not approved';
+      document.getElementById('msg').textContent = 'Go back to Pulse and try again. The bank said: ' + (fwd.get('error_description') || fwd.get('error'));
+    }
+    addr.textContent = location.href;
+    document.getElementById('copy').addEventListener('click', function () {
+      navigator.clipboard.writeText(location.href).then(function () { document.getElementById('copy').textContent = 'Copied ✓'; });
+    });
+    setTimeout(function () { manual.classList.remove('hidden'); }, 4000);
+    location.replace('http://localhost:47285/callback?' + fwd.toString());
+  })();
+</script>
+</body>
+</html>

@@ -47,10 +47,11 @@ describe('statement import', () => {
 
   it('reads a Nationwide style file with preamble and paid in/out columns', () => {
     const csv = `"Account Name:","FlexAccount ****1234"\n"Account Balance:","£1,000.00"\n\n"Date","Transaction type","Description","Paid out","Paid in","Balance"\n"02 Sep 2026","Contactless","TESCO STORES","£23.40","","£976.60"\n"25 Sep 2026","Bank credit","ACME LTD SALARY","","£2,850.00","£3,826.60"`;
-    const { rows } = parseStatement(csv);
+    const { rows, bank } = parseStatement(csv);
+    expect(bank).toBe('nationwide');
     expect(rows).toEqual([
-      { date: '2026-09-02', amount: -23.4, description: 'TESCO STORES' },
-      { date: '2026-09-25', amount: 2850, description: 'ACME LTD SALARY' },
+      { date: '2026-09-02', amount: -23.4, description: 'TESCO STORES', account: 'Nationwide', bank: 'nationwide' },
+      { date: '2026-09-25', amount: 2850, description: 'ACME LTD SALARY', account: 'Nationwide', bank: 'nationwide' },
     ]);
   });
 

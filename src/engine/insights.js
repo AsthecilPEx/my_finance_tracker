@@ -1,7 +1,7 @@
 import { addDays, daysBetween, daysInMonth, lastMonths, monthLabel, parseISO } from './dates.js';
 import { categoryMap, merchantKey, SPENDING_TYPES } from './categories.js';
 import { categoryTotalsByMonth } from './summary.js';
-import { detectRecurring, monthlyEquivalent, prettyName } from './recurring.js';
+import { detectRecurring, monthlyEquivalent, prettyName, recentActuals } from './recurring.js';
 import { simulatePayoff } from './debt.js';
 import { financialView } from './view.js';
 import { fxDrift } from './fx.js';
@@ -225,6 +225,17 @@ export function generateInsights(state, today, currency = 'GBP') {
     const hist = txns.filter((x) => x.categoryId === t.categoryId && x.amount < 0 && !x.date.startsWith(curKey)).map((x) => -x.amount);
     if (hist.length >= 5 && -t.amount > 3 * median(hist)) {
       cards.push({ id: `big-${t.id}`, kind: 'info', icon: '🔎', title: `Large ${cats[t.categoryId]?.name.toLowerCase()} purchase: ${fmt(-t.amount)}`, detail: `${t.description} on ${t.date}. That's more than 3× your typical ${cats[t.categoryId]?.name.toLowerCase()} purchase.` });
+    }
+  }
+
+  // 10. A usage-based bill that came in well above its usual amount (last 45 days).
+  for (const r of (state.recurring || []).filter((x) => x.variable && x.active !== false && x.direction !== 'in')) {
+    const recent = recentActuals(r, state.transactions, { n: 4, before: addDays(today, 1) });
+    const lastTxn = recent.length >= 2 ? state.transactions.find((t) => Math.abs(t.amount) === recent[0] && daysBetween(t.date, today) <= 45 && (r.match || r.name || '').toLowerCase().split(/[,|]/).some((w) => w.trim() && (t.description || '').toLowerCase().includes(w.trim()))) : null;
+    if (!lastTxn) continue;
+    const usual = recent.slice(1).reduce((a, b) => a + b, 0) / (recent.length - 1);
+    if (usual > 0 && recent[0] > usual * 1.3 && recent[0] - usual >= 10) {
+      cards.push({ id: `bill-spike-${r.id}-${lastTxn.date}`, kind: 'warning', icon: '📈', title: `${r.name} was ${Math.round((recent[0] / usual - 1) * 100)}% higher than usual`, detail: `${fmt(recent[0])} on ${lastTxn.date}, against a usual ${fmt(usual)}. Worth checking a meter reading or your tariff.` });
     }
   }
 

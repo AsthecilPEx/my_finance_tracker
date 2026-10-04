@@ -5,6 +5,7 @@
 // The renderer (UI) has no network access at all; see the request blocking in main.js.
 export const ALLOWED_HOSTS = new Set([
   'api.enablebanking.com', // Open Banking (read-only)
+  'api.monzo.com', // Monzo's own developer API (read-only)
   'api.frankfurter.dev', // ECB reference exchange rates
   'api.frankfurter.app',
   'open.er-api.com', // fallback exchange rates

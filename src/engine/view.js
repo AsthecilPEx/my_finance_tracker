@@ -5,6 +5,8 @@
 // through all totals, meters, forecasts, caps and insights without special cases.
 import { toBase, baseCurrency } from './fx.js';
 import { myAmount } from './split.js';
+import { isCardDebt, isCardEmi, cardOutstanding, currentBill, emiStatus, emiSchedule } from './cards.js';
+import { todayISO } from './dates.js';
 
 const cache = new WeakMap();
 
@@ -23,6 +25,36 @@ export function financialView(state) {
       : d)),
     transactions: (state.transactions || []).map((t) => (t.amount < 0 && t.split?.owed > 0 ? { ...t, amount: myAmount(t), rawAmount: t.amount } : t)),
   };
+  // Tracked credit cards and their EMI plans: balances and payments come from the card's transactions.
+  if ((state.debts || []).some((d) => isCardDebt(d) || isCardEmi(d))) {
+    const today = todayISO();
+    const cards = Object.fromEntries(view.debts.filter(isCardDebt).map((d) => [d.id, d]));
+    view.debts = view.debts.map((d) => {
+      if (isCardDebt(d)) {
+        const bill = currentBill(state, d, today);
+        return { ...d, balance: cardOutstanding(state, d, today), minPayment: bill.payment, nextBill: bill };
+      }
+      if (isCardEmi(d)) {
+        const st = emiStatus(d, cards[d.viaCard], today);
+        return { ...d, balance: st.remaining, originalBalance: d.principal, minPayment: st.done ? 0 : st.instalment, emi: st };
+      }
+      return d;
+    });
+    // An EMI'd purchase isn't one big spend: each billed instalment counts in its own month instead.
+    const plans = view.debts.filter(isCardEmi);
+    const byTxn = new Map(plans.map((p) => [p.txnId, p]));
+    const extra = [];
+    view.transactions = view.transactions.map((t) => (t.emiId && byTxn.has(t.id) ? { ...t, categoryId: 'transfer', emiConverted: true } : t));
+    for (const p of plans) {
+      const src = (state.transactions || []).find((t) => t.id === p.txnId);
+      for (const r of emiSchedule(p, cards[p.viaCard])) {
+        if (r.date > today) break;
+        extra.push({ id: `emi:${p.id}:${r.k}`, date: r.date, amount: -r.amount, description: `${p.name} (instalment ${r.k}/${p.tenure})`, categoryId: src?.categoryId || 'debt', account: cards[p.viaCard]?.cardAccount || '', source: 'emi', virtual: true });
+      }
+    }
+    if (extra.length) view.transactions = [...view.transactions, ...extra].sort((a, b) => b.date.localeCompare(a.date));
+  }
   cache.set(state, view);
   return view;
 }
+

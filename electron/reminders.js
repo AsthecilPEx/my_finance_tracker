@@ -3,6 +3,8 @@ import { upcoming } from '../src/engine/summary.js';
 import { evaluateCaps } from '../src/engine/caps.js';
 import { payPlan } from '../src/engine/planner.js';
 import { formatMoney } from '../src/engine/money.js';
+import { staleStatements } from '../src/engine/freshness.js';
+import { billsNeedingAmounts } from '../src/engine/review.js';
 
 /** Desktop notifications: bills, payday routine, spend caps and bank consent expiry. Each fires once. */
 export function startReminders({ getState, notify, sent }) {
@@ -34,6 +36,19 @@ export function startReminders({ getState, notify, sent }) {
     const exp = state.settings.bank?.expires;
     if (state.settings.bank?.connected && exp && exp - Date.now() < 7 * 86400000) {
       once(`bank-expiry-${exp}`, 'Bank connection expires soon', 'Reconnect in Bank Sync to keep transactions flowing in automatically.', 'connect');
+    }
+    for (const o of billsNeedingAmounts(state, today)) {
+      const card = o.source === 'debt';
+      once(`amount:${o.key}`, card ? `💳 ${o.name} statement is out` : `🧾 Is your ${o.name} bill out?`, `Due ${o.date}. Pulse is planning ≈ ${fmt(-o.amount)}. Enter the real amount under "Needs your attention" so your plan stays accurate.`, 'dashboard');
+    }
+    const mz = state.settings.monzo;
+    if (mz?.connected && mz.approvedAt && !mz.needsReconnect) {
+      const left = 90 - Math.floor((Date.now() - Date.parse(mz.approvedAt)) / 86400000);
+      if (left <= 7 && left >= 0) once(`monzo-renew-${mz.approvedAt}`, 'Monzo access renews soon', `Monzo asks you to re-approve Pulse every 90 days (${left} day${left === 1 ? '' : 's'} left). Open Bank Sync → Monzo → Reconnect.`, 'connect');
+    }
+    for (const s of staleStatements(state, today)) {
+      // Once per bank per week of staleness.
+      once(`stale:${s.bank}:${Math.floor(s.days / 7)}`, `📄 Time for a new ${s.name} statement`, `Last imported ${s.days} days ago. ${s.howTo}`, 'connect');
     }
     for (const [k, d] of Object.entries(log)) if ((Date.parse(today) - Date.parse(d)) / 86400000 > 60) delete log[k];
     sent.set('keys', log);

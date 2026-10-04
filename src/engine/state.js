@@ -4,6 +4,7 @@ import { daysBetween } from './dates.js';
 import { normaliseItem } from './receipts.js';
 import { applyPlan, undoPlan } from './aiplan.js';
 import { toBase, baseCurrency, rateFor } from './fx.js';
+import { applyCardRules, isCardDebt, isCardEmi, isCardPayment, instalmentFor, usableMatch } from './cards.js';
 
 export const STATE_VERSION = 2;
 
@@ -21,6 +22,8 @@ export function createEmptyState() {
       watchEnabled: false,
       widget: { pinned: true, opacity: 0.96 },
       bank: { provider: 'enablebanking', connected: false, institutionId: '', institutionName: '', sessionId: '', accounts: [], lastSync: null, autoSync: true },
+      monzo: { connected: false, accounts: [], lastSync: null, needsApproval: false, approvedAt: null, needsReconnect: false },
+      statementReminderDays: 7,
       billPot: { enabled: true, balance: 0 },
       debtPlan: { strategy: 'avalanche', extra: 100 },
       receiptPrompts: true,
@@ -34,6 +37,8 @@ export function createEmptyState() {
     rules: [],
     accounts: [],
     imports: [],
+    bankImports: {},
+    accountTypes: {}, // account name -> 'bank' | 'card' (cards are debts with cardAccount)
     receipts: [],
     receiptSkips: [],
     itemRules: {},
@@ -57,6 +62,7 @@ export function migrate(state) {
   const merged = { ...base, ...state, settings: { ...base.settings, ...(state.settings || {}) } };
   merged.settings.widget = { ...base.settings.widget, ...(state.settings?.widget || {}) };
   merged.settings.bank = { ...base.settings.bank, ...(state.settings?.bank || {}) };
+  merged.settings.monzo = { ...base.settings.monzo, ...(state.settings?.monzo || {}) };
   merged.settings.billPot = { ...base.settings.billPot, ...(state.settings?.billPot || {}) };
   merged.profile = { ...base.profile, ...(state.profile || {}) };
   if (!merged.profile.name && state.settings?.name) merged.profile.name = state.settings.name;
@@ -104,8 +110,20 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
   const added = [];
   let duplicates = 0;
   const base = baseCurrency(state);
+  // A live-synced payment seen again (e.g. a pending card payment that has now settled for a
+  // slightly different amount) updates the existing transaction instead of being skipped.
+  const updates = new Map();
+  const byExternal = new Map(state.transactions.filter((t) => t.externalId).map((t) => [t.externalId, t]));
   for (let row of rows) {
-    if (row.externalId && external.has(row.externalId)) { duplicates++; continue; }
+    if (row.externalId && external.has(row.externalId)) {
+      const prev = byExternal.get(row.externalId);
+      if (prev && (round2(prev.amount) !== round2(row.amount) || prev.date !== row.date || !!prev.pending !== !!row.pending)) {
+        updates.set(prev.id, { amount: round2(row.amount), date: row.date, pending: !!row.pending });
+      }
+      duplicates++;
+      continue;
+    }
+    row = applyCardRules(state, row); // card exports' signs, card bill payments as transfers
     if (row.currency && row.currency !== base) row = foreignRow(state, row);
     const base = importKey(row);
     const n = (seen.get(base) || 0) + 1;
@@ -122,16 +140,28 @@ export function mergeRows(state, rows, source, { fileName } = {}) {
       account: row.account || '',
       importKey: key,
       externalId: row.externalId,
+      ...(row.pending ? { pending: true } : {}),
       ...(row.original ? { original: row.original } : {}),
       createdAt: new Date().toISOString(),
     });
   }
-  const transactions = [...state.transactions, ...added].sort((a, b) => b.date.localeCompare(a.date));
+  const patched = updates.size
+    ? state.transactions.map((t) => (updates.has(t.id) ? (({ pending, ...rest }) => { const u = updates.get(t.id); return { ...rest, amount: u.amount, date: u.date, ...(u.pending ? { pending: true } : {}) }; })(t) : t))
+    : state.transactions;
+  const transactions = [...patched, ...added].sort((a, b) => b.date.localeCompare(a.date));
+  const now = new Date().toISOString();
+  const bank = rows.find((r) => r.bank)?.bank || null;
   const imports = [
-    { id: newId(), at: new Date().toISOString(), source, fileName: fileName || '', added: added.length, duplicates },
+    { id: newId(), at: now, source, fileName: fileName || '', added: added.length, duplicates, ...(bank ? { bank } : {}) },
     ...(state.imports || []),
   ].slice(0, 50);
-  return { state: { ...state, transactions, imports }, added: added.length, duplicates };
+  // When each bank's statement was last brought in, and how recent its newest transaction is.
+  let bankImports = state.bankImports || {};
+  if (bank) {
+    const latest = rows.reduce((m, r) => (r.date > m ? r.date : m), bankImports[bank]?.latest || '');
+    bankImports = { ...bankImports, [bank]: { at: now, latest } };
+  }
+  return { state: { ...state, transactions, imports, bankImports }, added: added.length, duplicates };
 }
 
 /** A row in another currency: store the base-currency amount at today's rate and keep the original. */
@@ -153,7 +183,7 @@ export function reduce(state, action) {
   const p = action.payload;
   switch (action.type) {
     case 'settings/update':
-      return { ...state, settings: { ...state.settings, ...p, widget: { ...state.settings.widget, ...(p.widget || {}) }, bank: { ...state.settings.bank, ...(p.bank || {}) } } };
+      return { ...state, settings: { ...state.settings, ...p, widget: { ...state.settings.widget, ...(p.widget || {}) }, bank: { ...state.settings.bank, ...(p.bank || {}) }, monzo: { ...state.settings.monzo, ...(p.monzo || {}) } } };
 
     case 'txn/add': {
       const { currency, ...rest } = p;
@@ -193,8 +223,89 @@ export function reduce(state, action) {
 
     case 'debt/save':
       return { ...state, debts: upsert(state.debts, { ...p, balance: round2(+p.balance || 0), originalBalance: p.originalBalance || +p.balance || 0 }) };
-    case 'debt/delete':
-      return { ...state, debts: state.debts.filter((d) => d.id !== p.id) };
+    case 'debt/delete': {
+      const d = state.debts.find((x) => x.id === p.id);
+      if (!d) return state;
+      // Removing a tracked card removes its EMI plans; removing a plan puts the purchase back to normal.
+      const gone = new Set([d.id, ...(isCardDebt(d) ? state.debts.filter((x) => isCardEmi(x) && x.viaCard === d.id).map((x) => x.id) : [])]);
+      return {
+        ...state,
+        debts: state.debts.filter((x) => !gone.has(x.id)),
+        transactions: state.transactions.map((t) => (t.emiId && gone.has(t.emiId) ? (({ emiId, ...rest }) => rest)(t) : t)),
+        accountTypes: isCardDebt(d) ? { ...(state.accountTypes || {}), [d.cardAccount]: 'bank' } : state.accountTypes,
+      };
+    }
+
+    // ---- accounts and tracked credit cards
+    case 'account/classify':
+      return { ...state, accountTypes: { ...(state.accountTypes || {}), [p.account]: p.kind } };
+    case 'card/save': {
+      const prev = state.debts.find((d) => d.id === p.id) || state.debts.find((d) => isCardDebt(d) && d.cardAccount === p.cardAccount);
+      const card = {
+        ...(prev || {}),
+        ...p,
+        id: prev?.id || p.id || newId(),
+        type: 'credit-card',
+        statementDay: Math.min(31, Math.max(1, parseInt(p.statementDay, 10) || 1)),
+        dueDay: Math.min(31, Math.max(1, parseInt(p.dueDay, 10) || 1)),
+        apr: +p.apr || 0,
+        minPct: p.minPct === '' || p.minPct === undefined ? 3 : +p.minPct,
+        minFloor: p.minFloor === '' || p.minFloor === undefined ? 25 : +p.minFloor,
+        fixedPayment: +p.fixedPayment || 0,
+        creditLimit: +p.creditLimit || 0,
+        match: String(p.match || p.name || '').toLowerCase().trim(),
+        flipSign: !!p.flipSign,
+        balance: 0,
+      };
+      const flip = !!prev?.flipSign !== card.flipSign;
+      const transactions = state.transactions.map((t) => {
+        let next = t;
+        if (t.account === card.cardAccount) {
+          if (flip) {
+            const suffix = (t.importKey || '').split('#')[1];
+            next = { ...next, amount: -next.amount, ...(t.importKey ? { importKey: `${importKey({ ...t, amount: -t.amount })}#${suffix || 1}` } : {}) };
+          }
+          if (!next.manualCategory && isCardPayment({ ...next, categoryId: '' })) next = { ...next, categoryId: 'transfer' };
+        } else if (!t.manualCategory && t.amount < 0 && usableMatch(card) && String(t.description || '').toLowerCase().includes(usableMatch(card))) {
+          next = { ...next, categoryId: 'transfer' }; // paying this card's bill from a bank account
+        }
+        return next;
+      });
+      return {
+        ...state,
+        transactions,
+        debts: prev ? state.debts.map((d) => (d.id === prev.id ? card : d)) : [...state.debts, card],
+        accountTypes: { ...(state.accountTypes || {}), [card.cardAccount]: 'card' },
+      };
+    }
+    case 'emi/save': {
+      const txn = state.transactions.find((t) => t.id === p.txnId);
+      const card = txn && state.debts.find((d) => isCardDebt(d) && d.cardAccount === txn.account);
+      if (!txn || !card || txn.amount >= 0) return state;
+      const prev = state.debts.find((d) => d.id === p.id);
+      const principal = round2(Math.abs(+p.principal || txn.amount));
+      const plan = {
+        ...(prev || {}),
+        id: prev?.id || p.id || newId(),
+        type: 'card-emi',
+        name: p.name || `${txn.description} EMI`,
+        viaCard: card.id,
+        txnId: txn.id,
+        principal,
+        apr: +p.apr || 0,
+        tenure: Math.max(1, parseInt(p.tenure, 10) || 1),
+        fee: +p.fee || 0,
+        firstClose: p.firstClose,
+        instalment: instalmentFor(principal, +p.apr || 0, parseInt(p.tenure, 10) || 1),
+        lender: card.name,
+        balance: principal,
+      };
+      return {
+        ...state,
+        debts: prev ? state.debts.map((d) => (d.id === prev.id ? plan : d)) : [...state.debts, plan],
+        transactions: state.transactions.map((t) => (t.id === txn.id ? { ...t, emiId: plan.id } : t)),
+      };
+    }
 
     case 'category/save':
       return { ...state, categories: upsert(state.categories, p) };
@@ -280,8 +391,12 @@ export function reduce(state, action) {
     case 'plan/undo':
       return undoPlan(state, p.id);
 
-    case 'accounts/set':
-      return { ...state, accounts: p };
+    case 'accounts/set': {
+      // Each live source (Enable Banking, Monzo) owns its own balances; a plain array is the old Enable Banking form.
+      const source = Array.isArray(p) ? 'bank' : p.source;
+      const list = (Array.isArray(p) ? p : p.accounts).map((a) => ({ ...a, source }));
+      return { ...state, accounts: [...(state.accounts || []).filter((a) => (a.source || 'bank') !== source), ...list] };
+    }
     case 'data/replace':
       return migrate(p);
     case 'data/reset':

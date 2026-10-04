@@ -19,6 +19,7 @@ import UpdateBanner from './components/UpdateBanner.jsx';
 import { APP_VERSION } from '../config.js';
 import { receiptInbox } from '../engine/receipts.js';
 import Settings from './pages/Settings.jsx';
+import { NewAccountPrompt } from './components/Cards.jsx';
 
 const PAGES = [
   { id: 'dashboard', label: 'Dashboard', icon: '◉', Component: Dashboard },
@@ -68,6 +69,7 @@ export default function App() {
         <Component go={setPage} />
       </main>
       {adding && <Modal title="Add transaction" onClose={() => setAdding(false)}><TxnForm onDone={() => setAdding(false)} /></Modal>}
+      {!adding && <NewAccountPrompt />}
       {toast && <div className={`toast ${toast.kind}`} role="status">{toast.message}</div>}
     </div>
   );
