@@ -57,7 +57,7 @@
 2. **Statements: Lloyds, Halifax, HSBC, Barclays, Revolut, Starling, Nationwide and more.** Pulse recognises each bank's CSV format automatically (HSBC's header-less layout, Barclays' padded memos, Revolut's pending/declined rows and fees, Lloyds' debit/credit columns). Point the **watched folder** at your Downloads and every statement you download is imported by itself. Anything already in Pulse is skipped. **Bank Sync** shows how up to date each bank is and where its download button lives, and Pulse reminds you when a statement is over a week old.
 3. **EU/EEA banks: Enable Banking.** A regulated Open Banking provider, free for personal use in *restricted* mode, which covers EU/EEA banks only (not the UK). Production apps need an `https://` redirect, so register `https://asthecilpex.github.io/my_finance_tracker/callback/`. That small page (in `docs/callback/`, served by GitHub Pages) hands the bank's reply straight to Pulse on your own PC (`http://localhost:47285`). It stores nothing, and the one-time code is useless without your private key.
 
-*Why UK banks other than Monzo can't sync live:* UK Open Banking data is only available to regulated companies under a business contract (TrueLayer, Yapily, Plaid, Enable Banking's paid tier). GoCardless Bank Account Data, the old free option, closed to new sign-ups in 2025.
+4. **Other UK banks: TrueLayer (live).** Lloyds, HSBC, Barclays, Revolut and most UK banks, read-only. Create an app at console.truelayer.com, switch it to **Live** (the **Data** add-on must show *Active*), add the redirect URI `http://localhost:47287/truelayer/callback`, create a client secret and enter the client ID and secret in **Bank Sync**. Then **Connect a bank** for each one. Pulse syncs once a day in the background (banks limit unattended reads), "Sync now" at most every 4 hours, keeps pending payments apart until they clear, and asks you to renew each bank every 90 days. See [docs/design/bank-sync.md](docs/design/bank-sync.md).
 
 ## Releasing a new version (for the maintainer)
 
@@ -83,11 +83,11 @@ npm run dev        # hot-reload development
 
 ## Security
 
-- **One way out to the internet.** All network traffic goes through a single gateway in the background process. It allows HTTPS only, to an allow-list of services (Monzo's API, Enable Banking and the two exchange-rate providers). It follows redirects only to allowed hosts and enforces timeouts and response-size limits. TLS certificates are checked by Chromium against Windows' certificate store.
+- **One way out to the internet.** All network traffic goes through a single gateway in the background process. It allows HTTPS only, to an allow-list of services (Monzo's API, TrueLayer, Enable Banking and the two exchange-rate providers). It follows redirects only to allowed hosts and enforces timeouts and response-size limits. TLS certificates are checked by Chromium against Windows' certificate store.
 - **The UI is offline.** Its web requests are blocked except local app files and bank logos, it runs in a sandbox with no Node.js, all web permissions (camera, notifications, etc.) are denied, and it has a strict Content-Security-Policy.
 - **Tamper-resistant build.** Electron fuses disable running the app as plain Node, `NODE_OPTIONS` injection and debugger attachment, and only load code from the signed app archive.
-- **Sign-in redirects stay on your PC.** When you connect Monzo or Enable Banking, Pulse briefly listens on `localhost` only (never your network) for the bank's reply, checks it belongs to the request it started, then stops listening.
-- **Secrets encrypted** with Windows DPAPI (bank keys, Monzo client secret and tokens). Receipt photos are referenced by random IDs only (path traversal is blocked).
+- **Sign-in redirects stay on your PC.** When you connect Monzo, TrueLayer or Enable Banking, Pulse briefly listens on `localhost` only (never your network) for the bank's reply, checks it belongs to the request it started, then stops listening.
+- **Secrets encrypted** with Windows DPAPI (bank keys, Monzo and TrueLayer client secrets and tokens). Receipt photos are referenced by random IDs only (path traversal is blocked).
 - No software can honestly promise to be attack-proof. Keep Windows updated, and code-sign the installer before sharing it widely.
 
 ## Your data and privacy

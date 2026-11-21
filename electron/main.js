@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store, JsonFile } from './store.js';
 import { FolderWatcher } from './watcher.js';
-import { EnableBankingConnector, MonzoConnector } from './connectors/index.js';
+import { EnableBankingConnector, MonzoConnector, TrueLayerConnector } from './connectors/index.js';
 import { recognise } from './ocr.js';
 import { startReminders } from './reminders.js';
 import { reduce, migrate } from '../src/engine/state.js';
@@ -38,6 +38,7 @@ let quitting = false;
 let watcher;
 let bank;
 let monzo;
+let truelayer;
 let fxUpdater;
 let updater;
 let logger;
@@ -221,6 +222,7 @@ function updateTray() {
     { label: widgetWin ? 'Hide desktop widget' : 'Show desktop widget', click: () => toggleWidget() },
     ...(bankConnected ? [{ label: 'Sync bank now', click: () => bank.sync().then((r) => notify('Bank synced', `${r.added} new transactions`)).catch((e) => notify('Sync failed', e.message)) }] : []),
     ...(store.get().settings.monzo?.connected ? [{ label: 'Sync Monzo now', click: () => monzo.sync().then((r) => notify('Monzo synced', `${r.added} new transactions`)).catch((e) => notify('Monzo sync failed', e.message)) }] : []),
+    ...((store.get().settings.truelayer?.connections || []).length ? [{ label: 'Sync banks (TrueLayer) now', click: () => truelayer.sync().then((r) => notify('Banks synced', `${r.added} new transactions`)).catch((e) => notify('Bank sync failed', e.message)) }] : []),
     { type: 'separator' },
     { label: 'Quit Pulse', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -362,6 +364,25 @@ function registerIpc() {
   });
   handle('monzo:disconnect', async () => { await monzo.disconnect(); updateTray(); });
 
+  handle('truelayer:info', () => truelayer.info());
+  handle('truelayer:saveClient', (id, secret) => truelayer.saveClient(id, secret));
+  handle('truelayer:connect', async (reconnectId) => {
+    const before = new Set(store.get().transactions.map((t) => t.id));
+    const r = await truelayer.connect(typeof reconnectId === 'string' ? reconnectId : undefined);
+    updateTray();
+    showMain();
+    promptForReceipts(before);
+    return r;
+  });
+  handle('truelayer:completeWithUrl', (url) => truelayer.completeWithUrl(url));
+  handle('truelayer:sync', async () => {
+    const before = new Set(store.get().transactions.map((t) => t.id));
+    const r = await truelayer.sync();
+    promptForReceipts(before);
+    return r;
+  });
+  handle('truelayer:disconnect', async (id) => { await truelayer.disconnect(String(id || '')); updateTray(); });
+
   handle('fx:refresh', () => fxUpdater.refresh());
   handle('update:status', () => updater.status());
   handle('update:check', () => updater.check());
@@ -465,7 +486,8 @@ app.whenReady().then(() => {
     broadcast: (status) => { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('update:status', status); },
   });
   monzo = new MonzoConnector({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), fetchImpl: secureFetch, log });
-  for (const c of [bank, monzo]) {
+  truelayer = new TrueLayerConnector({ secrets, getState: () => store.get(), dispatch, notify, openExternal: (url) => shell.openExternal(url), fetchImpl: secureFetch, log });
+  for (const c of [bank, monzo, truelayer]) {
     c.snapshot = () => new Set(store.get().transactions.map((t) => t.id));
     c.onNewTransactions = (added, from, before) => {
       notify('Bank synced', `${added} new transaction${added === 1 ? '' : 's'} from ${from}`, 'transactions');
@@ -492,6 +514,7 @@ app.on('before-quit', () => {
   watcher?.stop();
   bank?.stop();
   monzo?.stop();
+  truelayer?.stop();
   fxUpdater?.stop();
   updater?.stop();
 });

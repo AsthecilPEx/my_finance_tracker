@@ -23,6 +23,7 @@ export function createEmptyState() {
       widget: { pinned: true, opacity: 0.96 },
       bank: { provider: 'enablebanking', connected: false, institutionId: '', institutionName: '', sessionId: '', accounts: [], lastSync: null, autoSync: true },
       monzo: { connected: false, accounts: [], lastSync: null, needsApproval: false, approvedAt: null, needsReconnect: false },
+      truelayer: { connections: [], pending: [] },
       statementReminderDays: 7,
       billPot: { enabled: true, balance: 0 },
       debtPlan: { strategy: 'avalanche', extra: 100 },
@@ -63,6 +64,7 @@ export function migrate(state) {
   merged.settings.widget = { ...base.settings.widget, ...(state.settings?.widget || {}) };
   merged.settings.bank = { ...base.settings.bank, ...(state.settings?.bank || {}) };
   merged.settings.monzo = { ...base.settings.monzo, ...(state.settings?.monzo || {}) };
+  merged.settings.truelayer = { ...base.settings.truelayer, ...(state.settings?.truelayer || {}) };
   merged.settings.billPot = { ...base.settings.billPot, ...(state.settings?.billPot || {}) };
   merged.profile = { ...base.profile, ...(state.profile || {}) };
   if (!merged.profile.name && state.settings?.name) merged.profile.name = state.settings.name;
@@ -219,7 +221,7 @@ export function reduce(state, action) {
   const p = action.payload;
   switch (action.type) {
     case 'settings/update':
-      return { ...state, settings: { ...state.settings, ...p, widget: { ...state.settings.widget, ...(p.widget || {}) }, bank: { ...state.settings.bank, ...(p.bank || {}) }, monzo: { ...state.settings.monzo, ...(p.monzo || {}) } } };
+      return { ...state, settings: { ...state.settings, ...p, widget: { ...state.settings.widget, ...(p.widget || {}) }, bank: { ...state.settings.bank, ...(p.bank || {}) }, monzo: { ...state.settings.monzo, ...(p.monzo || {}) }, truelayer: { ...state.settings.truelayer, ...(p.truelayer || {}) } } };
 
     case 'txn/add': {
       const { currency, ...rest } = p;
@@ -431,7 +433,7 @@ export function reduce(state, action) {
       return undoPlan(state, p.id);
 
     case 'accounts/set': {
-      // Each live source (Enable Banking, Monzo) owns its own balances; a plain array is the old Enable Banking form.
+      // Each live source (Enable Banking, Monzo, TrueLayer) owns its own balances; a plain array is the old Enable Banking form.
       const source = Array.isArray(p) ? 'bank' : p.source;
       const list = (Array.isArray(p) ? p : p.accounts).map((a) => ({ ...a, source }));
       return { ...state, accounts: [...(state.accounts || []).filter((a) => (a.source || 'bank') !== source), ...list] };

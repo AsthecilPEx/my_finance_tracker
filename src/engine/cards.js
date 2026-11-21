@@ -361,7 +361,7 @@ export function unclassifiedAccounts(state) {
   }
   return [...seen.values()].map((s) => ({
     ...s,
-    likelyCard: /flex|card|amex|american express|credit|mbna|capital one|vanquis|aqua|zopa/i.test(s.account),
+    likelyCard: live.get(s.account) === 'credit' || /flex|card|amex|american express|credit|mbna|capital one|vanquis|aqua|zopa/i.test(s.account),
     flex: /\bflex\b/i.test(s.account),
     // Card exports often list purchases as positive numbers.
     looksFlipped: s.count >= 3 && s.positive / s.count > 0.6,

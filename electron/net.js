@@ -6,6 +6,8 @@
 export const ALLOWED_HOSTS = new Set([
   'api.enablebanking.com', // Open Banking (read-only)
   'api.monzo.com', // Monzo's own developer API (read-only)
+  'auth.truelayer.com', // TrueLayer sign-in and tokens (UK Open Banking, read-only)
+  'api.truelayer.com', // TrueLayer Data API (read-only)
   'api.frankfurter.dev', // ECB reference exchange rates
   'api.frankfurter.app',
   'open.er-api.com', // fallback exchange rates

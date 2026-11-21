@@ -111,6 +111,14 @@ export const api = desktop || {
     sync: unsupported,
     disconnect: unsupported,
   },
+  truelayer: {
+    info: async () => ({ hasClient: false, redirectUrl: '' }),
+    saveClient: unsupported,
+    connect: unsupported,
+    completeWithUrl: unsupported,
+    sync: unsupported,
+    disconnect: unsupported,
+  },
   monzo: {
     info: async () => ({ hasClient: false, redirectUrl: '' }),
     saveClient: unsupported,

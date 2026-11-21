@@ -13,3 +13,4 @@
 // execution) must be a separate, explicitly-confirmed capability.
 export { EnableBankingConnector } from './enablebanking.js';
 export { MonzoConnector } from './monzo.js';
+export { TrueLayerConnector } from './truelayer.js';
