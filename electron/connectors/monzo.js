@@ -11,6 +11,7 @@ import { listenOnce, donePage } from './loopback.js';
 const API = 'https://api.monzo.com';
 const AUTH = 'https://auth.monzo.com/';
 export const MONZO_PORT = 47286;
+export const CANCELLED = 'Sign-in cancelled.';
 export const MONZO_REDIRECT = `http://localhost:${MONZO_PORT}/monzo/callback`;
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 const DAY = 86400000;
@@ -140,9 +141,12 @@ export class MonzoConnector {
     if (!c?.clientId) throw new Error('Add your Monzo Client ID and secret first.');
     const state = crypto.randomBytes(24).toString('hex');
     let resolveUrl;
+    let rejectWait;
+    let timer;
     const landed = new Promise((resolve, reject) => {
       resolveUrl = resolve;
-      setTimeout(() => reject(new Error('Timed out waiting for the Monzo email link. Try again.')), 20 * 60 * 1000);
+      rejectWait = reject;
+      timer = setTimeout(() => reject(new Error('Timed out waiting for the Monzo email link. Try again.')), 20 * 60 * 1000);
     });
     landed.catch(() => {});
     const server = await this.listen({
@@ -151,15 +155,22 @@ export class MonzoConnector {
       page: donePage('✓ Signed in to Monzo', 'Now open the <b>Monzo app</b> on your phone and approve Pulse Finance. Then go back to Pulse.'),
       onUrl: (u) => resolveUrl(u),
     });
-    this.pending = { state, resolve: resolveUrl };
+    this.pending = { state, resolve: resolveUrl, reject: rejectWait };
     try {
       const url = `${AUTH}?${new URLSearchParams({ client_id: c.clientId, redirect_uri: MONZO_REDIRECT, response_type: 'code', state })}`;
       await this.openExternal(url);
       return await this.finish(await landed);
     } finally {
+      clearTimeout(timer);
       this.pending = null;
       server.close();
     }
+  }
+
+  /** Stop waiting for the browser (it timed out, was closed, or you want to start again). */
+  cancel() {
+    this.pending?.reject(new Error(CANCELLED));
+    return { ok: true };
   }
 
   /** The address Monzo's email link opened (automatically, or pasted by the user). */

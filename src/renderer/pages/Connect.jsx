@@ -15,19 +15,18 @@ export default function Connect() {
   const [eu, setEu] = useState(!!state.settings.bank.connected);
   return (
     <div className="page">
-      <header className="page-head"><div><h1>Bank Sync</h1><p className="muted">Bring your transactions in. Everything is read-only: Pulse can never move money.</p></div></header>
+      <header className="page-head"><div><h1>Bank Sync</h1><p className="muted">Bring your transactions in. Everything is read-only.</p></div></header>
       <YourBanks />
       <MonzoConnect />
       <TrueLayerConnect />
       <div className="card">
-        <div className="card-head"><h3>📄 Statements: for banks you haven't connected live</h3><span className="muted sm">Pulse recognises each bank's file automatically</span></div>
-        <p className="muted">Download a statement (about 30 seconds). Pulse reads it, skips duplicates and reminds you when one is due.</p>
+        <div className="card-head"><h3>📄 Statements: for banks you haven't connected live</h3><Info>Download a statement (about 30 seconds). Pulse recognises each bank's file, skips duplicates and reminds you when one is due.</Info></div>
         <WatchFolder />
         <CsvImport />
         <BankGuides />
       </div>
       <div className="card">
-        <button className="linkish card-head" onClick={() => setEu((x) => !x)}><h3>{eu ? '▾' : '▸'} 🇪🇺 EU / EEA banks (Enable Banking)</h3><span className="muted sm">Live Open Banking for banks in the EU, Norway and Iceland. Not UK banks.</span></button>
+        <button className="linkish card-head" onClick={() => setEu((x) => !x)}><h3>{eu ? '▾' : '▸'} 🇪🇺 EU / EEA banks (Enable Banking)</h3></button>
         {eu && <OpenBanking />}
       </div>
       <ImportHistory />
@@ -47,7 +46,7 @@ function YourBanks() {
   const ago = (iso) => { const d = daysBetween(iso.slice(0, 10), today); return d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
   return (
     <div className="card">
-      <div className="card-head"><h3>Your banks</h3><span className="muted sm">How up to date each one is</span></div>
+      <div className="card-head"><h3>Your banks</h3><Info>How up to date each bank is.</Info></div>
       <ul className="list">
         {mz.connected && (
           <li className="list-row">
@@ -107,7 +106,7 @@ function MonzoConnect() {
 
   const run = async (label, fn) => {
     setBusy(label);
-    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+    try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
   const saveClient = () => run('client', async () => { setInfo(await api.monzo.saveClient(clientId, secret)); setSecret(''); notify('Monzo client saved, encrypted on this PC', 'good'); });
   const connect = () => run('connect', async () => {
@@ -135,8 +134,7 @@ function MonzoConnect() {
 
   return (
     <div className="card">
-      <div className="card-head"><h3>🟠 Monzo: live sync</h3>{mz.connected && <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}>● {mz.needsReconnect ? 'Needs reconnecting' : mz.needsApproval ? 'Waiting for approval' : 'Connected'}</span>}</div>
-      <p className="muted">Free, read-only live sync for your current, joint and Flex accounts.</p>
+      <div className="card-head"><h3>🟠 Monzo: live sync</h3><span className="head-right">{mz.connected && <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}>● {mz.needsReconnect ? 'Needs reconnecting' : mz.needsApproval ? 'Waiting for approval' : 'Connected'}</span>}<Info>Free, read-only live sync for your current, joint and Flex accounts.</Info></span></div>
       {!isDesktop ? <DesktopOnly /> : mz.connected && mz.needsApproval ? (
         <div className="callout">
           <p><b>📱 Approve "Pulse Finance" in the Monzo app on your phone.</b></p>
@@ -192,6 +190,7 @@ function MonzoConnect() {
               <p><b>1.</b> In the browser window that opened, enter your Monzo email.<br /><b>2.</b> Monzo emails you a link. <b>Open that email on this PC</b> and click the link.<br /><b>3.</b> Then approve "Pulse Finance" in the Monzo app on your phone.</p>
               <p className="muted sm">Opened the link on your phone by mistake? Copy the full address it opened (it contains <code>code=</code>) and paste it here:</p>
               <div className="inline-row"><input className="grow" value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} placeholder="http://localhost:47286/monzo/callback?code=…" /><button className="btn ghost" disabled={!pasteUrl} onClick={finishWithUrl}>Finish</button></div>
+              <p className="muted sm">Link expired or sign-in stuck? <button className="btn ghost sm" onClick={() => api.monzo.cancel()}>Cancel</button> and try again.</p>
             </div>
           )}
         </div>
@@ -211,24 +210,32 @@ function TrueLayerConnect() {
   const [busy, setBusy] = useState('');
   const [pasteUrl, setPasteUrl] = useState('');
   const [setup, setSetup] = useState(false);
+  const [problem, setProblem] = useState('');
 
   useEffect(() => { if (isDesktop) api.truelayer.info().then(setInfo); }, [conns.length]);
 
   const run = async (label, fn) => {
     setBusy(label);
-    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+    try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
-  const connect = (id) => run(id ? `re:${id}` : 'connect', async () => {
-    const r = await api.truelayer.connect(id);
-    notify(`${r.bank} connected: ${r.added} transactions imported`, 'good');
-  });
+  const connect = async (id) => {
+    setProblem('');
+    setBusy(id ? `re:${id}` : 'connect');
+    try {
+      const r = await api.truelayer.connect(id);
+      notify(`${r.bank} connected: ${r.added} transactions imported`, 'good');
+    } catch (e) {
+      const msg = String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+      if (!/cancelled/i.test(msg)) setProblem(msg);
+    } finally { setBusy(''); }
+  };
   const pending = tl.pending || [];
   const daysLeft = (c) => (c.consentExpiresAt ? Math.ceil((Date.parse(c.consentExpiresAt) - Date.now()) / 86400000) : null);
   const waiting = busy === 'connect' || busy.startsWith('re:');
 
   return (
     <div className="card">
-      <div className="card-head"><h3>🔵 Other UK banks: live sync</h3><span className="muted sm">Lloyds, HSBC, Barclays, Revolut and more, through TrueLayer</span></div>
+      <div className="card-head"><h3>🔵 Other banks: live sync</h3><span className="head-right">{conns.length > 0 && <span className={`badge ${conns.some((c) => c.needsReconnect) ? 'upcoming' : 'done'}`}>● {conns.some((c) => c.needsReconnect) ? 'Needs reconnecting' : 'Connected'}</span>}<Info>Lloyds, HSBC, Barclays, Revolut and more, read-only through TrueLayer.</Info></span></div>
       {!isDesktop ? <DesktopOnly /> : !info?.hasClient ? (
         !setup ? <button className="btn primary" onClick={() => setSetup(true)}>Set up (about 5 minutes)</button> : (
           <div className="steps">
@@ -264,7 +271,8 @@ function TrueLayerConnect() {
               })}
             </ul>
           )}
-          {pending.length > 0 && <p className="muted sm">⏳ On its way: {pending.length} pending payment{pending.length === 1 ? '' : 's'} ({fmt(pending.reduce((t, p) => t + p.amount, 0))}). Counted once they clear.</p>}
+          {problem && <div className="callout warn"><p><b>That bank didn't connect.</b> {problem}</p></div>}
+          {pending.length > 0 && <p className="muted sm">⏳ Pending: {pending.length} pending payment{pending.length === 1 ? '' : 's'} ({fmt(pending.reduce((t, p) => t + p.amount, 0))})</p>}
           <div className="inline-row wrap">
             <button className="btn primary" disabled={!!busy} onClick={() => connect()}>{busy === 'connect' ? 'Waiting for your bank…' : conns.length ? 'Connect another bank' : 'Connect a bank'}</button>
             {conns.length > 0 && <button className="btn ghost" disabled={!!busy} onClick={() => run('sync', async () => { const r = await api.truelayer.sync(); notify(r.waiting && !r.added ? 'Already synced in the last 4 hours. Banks limit how often Pulse can check.' : `Synced: ${r.added} new transactions`, r.added ? 'good' : 'info'); })}>{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>}
@@ -272,7 +280,8 @@ function TrueLayerConnect() {
           </div>
           {waiting && (
             <div className="callout">
-              <p>Pick your bank in the browser, log in and approve. Pulse finishes by itself.</p>
+              <div className="inline-row"><p className="grow">Pick your bank in the browser, log in and approve. Pulse finishes by itself.</p><button className="btn ghost" onClick={() => api.truelayer.cancel()}>Cancel</button></div>
+              <p className="muted sm">Page timed out or you closed it? Click <b>Cancel</b>, then connect again.</p>
               <p className="muted sm">Approved on your phone and the browser didn't come back? Paste the address it ended on (it contains <code>code=</code>):</p>
               <div className="inline-row"><input className="grow" value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} placeholder="http://localhost:47287/truelayer/callback?code=…" /><button className="btn ghost" disabled={!pasteUrl} onClick={async () => { try { await api.truelayer.completeWithUrl(pasteUrl.trim()); setPasteUrl(''); } catch (e) { notify(e.message, 'critical'); } }}>Finish</button></div>
             </div>
@@ -280,6 +289,17 @@ function TrueLayerConnect() {
         </>
       )}
     </div>
+  );
+}
+
+/** A small "!" in a card's corner: the explanation is there when you want it, not under every title. */
+function Info({ children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="info-wrap">
+      <button type="button" className="info-btn" aria-label="More info" aria-expanded={open} title={typeof children === 'string' ? children : undefined} onClick={() => setOpen((x) => !x)}>!</button>
+      {open && <span className="info-pop" role="note">{children}</span>}
+    </span>
   );
 }
 
@@ -291,10 +311,10 @@ function ImportHistory() {
       <div className="card-head"><h3>Sync & import history</h3></div>
       <ul className="list compact">
         {state.imports.slice(0, 12).map((i) => (
-          <li key={i.id} className="list-row">
+          <li key={i.id} className="history-row">
             <span className="muted nowrap">{new Date(i.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-            <span className="grow">{i.source === 'bank' ? '🏦 Bank sync' : i.source === 'monzo' ? '🟠 Monzo sync' : i.source === 'watch' ? '📂 Watched folder' : i.source === 'demo' ? 'Demo data' : '📄 Statement file'}{i.bank && BANK_FORMATS[i.bank] ? ` · ${BANK_FORMATS[i.bank].name}` : ''} {i.fileName && <span className="muted">· {i.fileName}</span>}</span>
-            <span>{i.added} added{i.duplicates ? <span className="muted"> · {i.duplicates} already had</span> : ''}</span>
+            <span>{i.source === 'bank' ? '🏦 Bank sync' : i.source === 'monzo' ? '🟠 Monzo sync' : i.source === 'truelayer' ? '🔵 Bank sync' : i.source === 'watch' ? '📂 Watched folder' : i.source === 'demo' ? 'Demo data' : '📄 Statement file'}{i.bank && BANK_FORMATS[i.bank] ? ` · ${BANK_FORMATS[i.bank].name}` : ''} {i.fileName && <span className="muted">· {i.fileName}</span>}</span>
+            <span className="nowrap">{i.added} added{i.duplicates ? <span className="muted"> · {i.duplicates} already had</span> : ''}</span>
           </li>
         ))}
       </ul>
@@ -418,7 +438,7 @@ function OpenBanking() {
 
   const run = async (label, fn) => {
     setBusy(label);
-    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+    try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
   const saveCreds = () => run('creds', async () => {
     await api.bank.saveCredentials(appId.trim(), pem.text);

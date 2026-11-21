@@ -142,6 +142,20 @@ await win.getByLabel('Edit goal').first().click(); await checkInputs('Edit goal'
 await nav('Bank Sync');
 await win.getByRole('button', { name: /Set up Monzo/ }).click(); await checkInputs('Bank Sync › Monzo setup');
 await win.getByRole('button', { name: /^Set up \(about 5 minutes\)$/ }).click(); await checkInputs('Bank Sync › TrueLayer setup');
+// A bank sign-in that never comes back (page timed out, tab closed) can be cancelled and started again.
+{
+  await app.evaluate(({ shell }) => { shell.openExternal = async () => {}; }); // don't open a real browser
+  const tl = win.locator('.card', { hasText: 'Other banks: live sync' });
+  await tl.getByLabel('Client ID').fill('pulsefinance-e2e123');
+  await tl.getByLabel('Client secret').fill('x'.repeat(36));
+  await tl.getByRole('button', { name: 'Save', exact: true }).click();
+  await tl.getByRole('button', { name: 'Connect a bank' }).click();
+  await tl.getByText('Waiting for your bank…').waitFor();
+  await tl.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await tl.getByRole('button', { name: 'Connect a bank' }).waitFor({ timeout: 5000 });
+  if (await win.getByText(/cancelled/i).count()) results.fail.push('Bank Sync › TrueLayer cancel shows an error');
+  results.ok++;
+}
 await win.getByText("Where's the download button for my bank?").click();
 await win.getByText(/EU \/ EEA banks/).click(); await checkInputs('Bank Sync › EU banks');
 // Edit a single payday from the calendar and check the change flows through.

@@ -610,3 +610,15 @@ ul.tidy li { margin: 2px 0; }
 .card-plans { margin-top: 10px; }
 .card-plans .list-row { gap: 10px; align-items: center; }
 .progress.thin { height: 4px; margin-top: 4px; }
+
+/* Bank Sync: explanations live behind a small "!" in the card corner */
+.head-right { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+.card-head > .info-wrap { margin-left: auto; }
+.info-wrap { position: relative; display: inline-flex; }
+.info-btn { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--axis); background: transparent; color: var(--muted); font: 700 12px/1 var(--font); cursor: pointer; padding: 0; }
+.info-btn:hover, .info-btn[aria-expanded="true"] { color: inherit; border-color: currentColor; }
+.info-pop { position: absolute; right: 0; top: 26px; z-index: 20; width: max-content; max-width: min(280px, 80vw); padding: 8px 10px; border-radius: 8px; background: var(--surface-3); color: var(--text); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: 13px; font-weight: 400; line-height: 1.4; }
+/* Sync & import history: fixed columns so dates, sources and counts line up */
+.history-row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.history-row:last-child { border-bottom: 0; }
+@media (max-width: 520px) { .history-row { grid-template-columns: 1fr auto; } .history-row > :first-child { grid-column: 1 / -1; } }

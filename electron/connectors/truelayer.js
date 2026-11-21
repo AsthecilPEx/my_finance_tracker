@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { addDays, todayISO } from '../../src/engine/dates.js';
 import { listenOnce, donePage } from './loopback.js';
+import { CANCELLED } from './monzo.js';
 
 // TrueLayer's Data API: read-only Open Banking for UK banks (Lloyds, HSBC, Barclays, Revolut…).
 // You create an app in TrueLayer's console (Data: Active, Live) and enter its client ID and
@@ -109,7 +110,16 @@ export class TrueLayerConnector {
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = {}; }
-    if (!res.ok) throw new TrueLayerError(data.error_description || data.error || `TrueLayer returned ${res.status}`, { status: res.status, code: data.error || '' });
+    if (!res.ok) {
+      const code = data.error || '';
+      const signIn = form.grant_type === 'authorization_code';
+      const message = code === 'invalid_client'
+        ? 'TrueLayer didn\'t accept your Client ID or secret. In TrueLayer\'s console switch to Live, create a new client secret under Settings, then in Pulse disconnect any banks, click Change client and paste both again.'
+        : signIn && code === 'invalid_grant'
+          ? 'Your bank sign-in finished, but its one-time code was already used or expired before Pulse could use it. Click Connect a bank and try again.'
+          : data.error_description || code || `TrueLayer returned ${res.status}`;
+      throw new TrueLayerError(message, { status: res.status, code });
+    }
     return data;
   }
 
@@ -150,26 +160,36 @@ export class TrueLayerConnector {
     const old = reconnectId ? this.connections().find((x) => x.id === reconnectId) : null;
     const state = crypto.randomBytes(24).toString('hex');
     let resolveUrl;
+    let rejectWait;
+    let timer;
     const landed = new Promise((resolve, reject) => {
       resolveUrl = resolve;
-      setTimeout(() => reject(new Error('Timed out waiting for your bank. Try again.')), 15 * 60 * 1000);
+      rejectWait = reject;
+      timer = setTimeout(() => reject(new Error('Timed out waiting for your bank. Try again.')), 15 * 60 * 1000);
     });
     landed.catch(() => {});
     const server = await this.listen({
       port: TRUELAYER_PORT,
       path: '/truelayer/callback',
-      page: donePage('✓ Bank connected', 'You can close this tab and go back to Pulse.'),
+      page: donePage('Back to Pulse', 'You can close this tab. Pulse shows whether your bank connected.'),
       onUrl: (u) => resolveUrl(u),
     });
-    this.pending = { state, resolve: resolveUrl, reconnectId: old?.id || null };
+    this.pending = { state, resolve: resolveUrl, reject: rejectWait, reconnectId: old?.id || null };
     try {
       const q = new URLSearchParams({ response_type: 'code', client_id: c.clientId, scope: SCOPES, redirect_uri: TRUELAYER_REDIRECT, state, providers: old?.providerId || 'uk-ob-all uk-oauth-all' });
       await this.openExternal(`${AUTH}/?${q}`);
       return await this.finish(await landed);
     } finally {
+      clearTimeout(timer);
       this.pending = null;
       server.close();
     }
+  }
+
+  /** Stop waiting for the browser (it timed out, was closed, or you want to start again). */
+  cancel() {
+    this.pending?.reject(new Error(CANCELLED));
+    return { ok: true };
   }
 
   /** The address the bank sent the browser back to (automatically, or pasted by the user). */

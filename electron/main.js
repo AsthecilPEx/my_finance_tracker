@@ -246,7 +246,12 @@ async function withDialog(fn) {
 }
 
 function registerIpc() {
-  const handle = (ch, fn) => ipcMain.handle(ch, (_e, ...args) => fn(...args));
+  const handle = (ch, fn) => ipcMain.handle(ch, async (_e, ...args) => {
+    try { return await fn(...args); } catch (err) {
+      if (/^(bank|monzo|truelayer):/.test(ch) && !/cancelled/i.test(err?.message || '')) log(`[${ch}] failed:`, err?.message || String(err));
+      throw err;
+    }
+  });
   handle('state:get', () => store.get());
   handle('state:dispatch', (action) => dispatch(action));
 
@@ -350,6 +355,7 @@ function registerIpc() {
     return r;
   });
   handle('monzo:completeWithUrl', (url) => monzo.completeWithUrl(url));
+  handle('monzo:cancel', () => monzo.cancel());
   handle('monzo:checkApproval', async () => {
     const before = new Set(store.get().transactions.map((t) => t.id));
     const r = await monzo.checkApproval();
@@ -375,6 +381,7 @@ function registerIpc() {
     return r;
   });
   handle('truelayer:completeWithUrl', (url) => truelayer.completeWithUrl(url));
+  handle('truelayer:cancel', () => truelayer.cancel());
   handle('truelayer:sync', async () => {
     const before = new Set(store.get().transactions.map((t) => t.id));
     const r = await truelayer.sync();
