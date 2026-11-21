@@ -169,3 +169,24 @@ describe('Bank copies of hand-entered purchases', () => {
     expect(s.transactions.find((t) => t.externalId === 'monzo:tx_2')).toMatchObject({ account: 'Monzo Flex', amount: -5 });
   });
 });
+
+describe('Monzo sign-in can be cancelled', () => {
+  it('stops waiting for the email link and closes the localhost listener', async () => {
+    const { MonzoConnector } = await import('../electron/connectors/monzo.js');
+    const store = { monzo: { clientId: 'oauth2client_abc123', clientSecret: 'mnzconf.' + 'x'.repeat(40) } };
+    let listening = false;
+    const m = new MonzoConnector({
+      secrets: { get: (k) => store[k] || null, set: (k, v) => { store[k] = v; } },
+      getState: () => ({ settings: { monzo: {} } }), dispatch: async () => {}, notify: () => {}, openExternal: async () => {},
+      fetchImpl: async () => { throw new Error('no network in this test'); }, log: () => {}, autoStart: false,
+      listen: async () => { listening = true; return { ok: true, close() { listening = false; } }; },
+    });
+    const waiting = m.connect();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(listening).toBe(true);
+    m.cancel();
+    await expect(waiting).rejects.toThrow('cancelled');
+    expect(listening).toBe(false);
+    expect(m.pending).toBe(null);
+  });
+});

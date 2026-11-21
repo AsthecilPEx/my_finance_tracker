@@ -107,7 +107,7 @@ function MonzoConnect() {
 
   const run = async (label, fn) => {
     setBusy(label);
-    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+    try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
   const saveClient = () => run('client', async () => { setInfo(await api.monzo.saveClient(clientId, secret)); setSecret(''); notify('Monzo client saved, encrypted on this PC', 'good'); });
   const connect = () => run('connect', async () => {
@@ -192,6 +192,7 @@ function MonzoConnect() {
               <p><b>1.</b> In the browser window that opened, enter your Monzo email.<br /><b>2.</b> Monzo emails you a link. <b>Open that email on this PC</b> and click the link.<br /><b>3.</b> Then approve "Pulse Finance" in the Monzo app on your phone.</p>
               <p className="muted sm">Opened the link on your phone by mistake? Copy the full address it opened (it contains <code>code=</code>) and paste it here:</p>
               <div className="inline-row"><input className="grow" value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} placeholder="http://localhost:47286/monzo/callback?code=…" /><button className="btn ghost" disabled={!pasteUrl} onClick={finishWithUrl}>Finish</button></div>
+              <p className="muted sm">Link expired or sign-in stuck? <button className="btn ghost sm" onClick={() => api.monzo.cancel()}>Cancel</button> and try again.</p>
             </div>
           )}
         </div>
@@ -216,7 +217,7 @@ function TrueLayerConnect() {
 
   const run = async (label, fn) => {
     setBusy(label);
-    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+    try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
   const connect = (id) => run(id ? `re:${id}` : 'connect', async () => {
     const r = await api.truelayer.connect(id);
@@ -272,7 +273,8 @@ function TrueLayerConnect() {
           </div>
           {waiting && (
             <div className="callout">
-              <p>Pick your bank in the browser, log in and approve. Pulse finishes by itself.</p>
+              <div className="inline-row"><p className="grow">Pick your bank in the browser, log in and approve. Pulse finishes by itself.</p><button className="btn ghost" onClick={() => api.truelayer.cancel()}>Cancel</button></div>
+              <p className="muted sm">Page timed out or you closed it? Click <b>Cancel</b>, then connect again.</p>
               <p className="muted sm">Approved on your phone and the browser didn't come back? Paste the address it ended on (it contains <code>code=</code>):</p>
               <div className="inline-row"><input className="grow" value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} placeholder="http://localhost:47287/truelayer/callback?code=…" /><button className="btn ghost" disabled={!pasteUrl} onClick={async () => { try { await api.truelayer.completeWithUrl(pasteUrl.trim()); setPasteUrl(''); } catch (e) { notify(e.message, 'critical'); } }}>Finish</button></div>
             </div>
@@ -418,7 +420,7 @@ function OpenBanking() {
 
   const run = async (label, fn) => {
     setBusy(label);
-    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+    try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
   const saveCreds = () => run('creds', async () => {
     await api.bank.saveCredentials(appId.trim(), pem.text);

@@ -7,7 +7,7 @@ import { ALLOWED_HOSTS } from '../electron/net.js';
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const today = new Date().toISOString().slice(0, 10);
 
-function harness({ fullHistory = true } = {}) {
+function harness({ fullHistory = true, browserReturns = true } = {}) {
   let state = { ...createEmptyState(), settings: { ...createEmptyState().settings, onboarded: true } };
   const store = {};
   const calls = [];
@@ -54,7 +54,7 @@ function harness({ fullHistory = true } = {}) {
   const t = new TrueLayerConnector({
     secrets, getState: () => state, dispatch, notify: (title) => notes.push(title), openExternal: async (url) => { opened.push(url); }, fetchImpl, log: () => {}, autoStart: false, now: () => clock,
     // Stand-in for the localhost listener: the bank "redirects" straight back with a good code.
-    listen: async ({ onUrl }) => { setTimeout(() => onUrl(`${TRUELAYER_REDIRECT}?code=good&state=${new URL(opened.at(-1)).searchParams.get('state')}`), 0); return { ok: true, close() {} }; },
+    listen: async ({ onUrl }) => { flags.listening = true; if (browserReturns) setTimeout(() => onUrl(`${TRUELAYER_REDIRECT}?code=good&state=${new URL(opened.at(-1)).searchParams.get('state')}`), 0); return { ok: true, close() { flags.listening = false; } }; },
   });
   return { t, calls, flags, store, opened, notes, advance: (ms) => { clock += ms; }, get state() { return state; } };
 }
@@ -159,5 +159,28 @@ describe('TrueLayer (other UK banks, live)', () => {
     expect(h.state.accounts.filter((a) => a.source === 'truelayer')).toEqual([]);
     expect(h.store.truelayer.tokens).toEqual({});
     expect(h.state.transactions.filter((x) => x.source === 'truelayer')).toHaveLength(3); // your history stays
+  });
+
+  it('a sign-in that never comes back can be cancelled and started again', async () => {
+    const h = harness({ browserReturns: false });
+    await h.t.saveClient('pulsefinance-abc123', 'x'.repeat(36));
+    const waiting = h.t.connect();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(h.flags.listening).toBe(true);
+    h.t.cancel();
+    await expect(waiting).rejects.toThrow('cancelled');
+    expect(h.flags.listening).toBe(false); // the localhost listener is closed straight away
+    expect(h.t.pending).toBe(null);
+    expect(h.t.cancel()).toEqual({ ok: true }); // nothing waiting: harmless
+  });
+
+  it('shows the bank\'s own error when it sends the browser back with one', async () => {
+    const h = harness({ browserReturns: false });
+    await h.t.saveClient('pulsefinance-abc123', 'x'.repeat(36));
+    const waiting = h.t.connect();
+    await new Promise((r) => setTimeout(r, 5));
+    h.t.completeWithUrl('http://localhost:47287/truelayer/callback?error=access_denied&error_description=Session%20expired');
+    await expect(waiting).rejects.toThrow('Session expired');
+    expect(h.flags.listening).toBe(false);
   });
 });

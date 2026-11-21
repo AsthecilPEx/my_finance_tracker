@@ -350,6 +350,7 @@ function registerIpc() {
     return r;
   });
   handle('monzo:completeWithUrl', (url) => monzo.completeWithUrl(url));
+  handle('monzo:cancel', () => monzo.cancel());
   handle('monzo:checkApproval', async () => {
     const before = new Set(store.get().transactions.map((t) => t.id));
     const r = await monzo.checkApproval();
@@ -375,6 +376,7 @@ function registerIpc() {
     return r;
   });
   handle('truelayer:completeWithUrl', (url) => truelayer.completeWithUrl(url));
+  handle('truelayer:cancel', () => truelayer.cancel());
   handle('truelayer:sync', async () => {
     const before = new Set(store.get().transactions.map((t) => t.id));
     const r = await truelayer.sync();
