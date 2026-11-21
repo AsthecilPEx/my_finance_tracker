@@ -24,6 +24,7 @@ function harness({ fullHistory = true, browserReturns = true } = {}) {
           return flags.deny ? json(400, { error: 'invalid_grant' }) : json(200, { access_token: `acc${flags.refreshes + 1}`, refresh_token: `ref${flags.refreshes + 1}`, expires_in: 3600 });
         }
         expect(f.get('redirect_uri')).toBe(TRUELAYER_REDIRECT);
+        if (f.get('client_secret') === 'y'.repeat(36)) return json(401, { error: 'invalid_client' });
         return f.get('code') === 'good' ? json(200, { access_token: 'acc1', refresh_token: 'ref1', expires_in: 3600 }) : json(400, { error: 'invalid_grant' });
       }
       if (u.pathname === '/api/delete') { flags.revoked++; return json(200, {}); }
@@ -181,6 +182,14 @@ describe('TrueLayer (other UK banks, live)', () => {
     await new Promise((r) => setTimeout(r, 5));
     h.t.completeWithUrl('http://localhost:47287/truelayer/callback?error=access_denied&error_description=Session%20expired');
     await expect(waiting).rejects.toThrow('Session expired');
+    expect(h.flags.listening).toBe(false);
+  });
+
+  it('explains a rejected client secret in plain English, and nothing is half-saved', async () => {
+    const h = harness();
+    await h.t.saveClient('pulsefinance-abc123', 'y'.repeat(36));
+    await expect(h.t.connect()).rejects.toThrow('switch to Live, create a new client secret');
+    expect(h.state.settings.truelayer.connections).toEqual([]);
     expect(h.flags.listening).toBe(false);
   });
 });

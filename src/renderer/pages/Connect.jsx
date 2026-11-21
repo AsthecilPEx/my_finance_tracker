@@ -212,6 +212,7 @@ function TrueLayerConnect() {
   const [busy, setBusy] = useState('');
   const [pasteUrl, setPasteUrl] = useState('');
   const [setup, setSetup] = useState(false);
+  const [problem, setProblem] = useState('');
 
   useEffect(() => { if (isDesktop) api.truelayer.info().then(setInfo); }, [conns.length]);
 
@@ -219,10 +220,17 @@ function TrueLayerConnect() {
     setBusy(label);
     try { return await fn(); } catch (e) { if (!/cancelled/i.test(e.message || '')) notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
   };
-  const connect = (id) => run(id ? `re:${id}` : 'connect', async () => {
-    const r = await api.truelayer.connect(id);
-    notify(`${r.bank} connected: ${r.added} transactions imported`, 'good');
-  });
+  const connect = async (id) => {
+    setProblem('');
+    setBusy(id ? `re:${id}` : 'connect');
+    try {
+      const r = await api.truelayer.connect(id);
+      notify(`${r.bank} connected: ${r.added} transactions imported`, 'good');
+    } catch (e) {
+      const msg = String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+      if (!/cancelled/i.test(msg)) setProblem(msg);
+    } finally { setBusy(''); }
+  };
   const pending = tl.pending || [];
   const daysLeft = (c) => (c.consentExpiresAt ? Math.ceil((Date.parse(c.consentExpiresAt) - Date.now()) / 86400000) : null);
   const waiting = busy === 'connect' || busy.startsWith('re:');
@@ -265,6 +273,7 @@ function TrueLayerConnect() {
               })}
             </ul>
           )}
+          {problem && <div className="callout warn"><p><b>That bank didn't connect.</b> {problem}</p></div>}
           {pending.length > 0 && <p className="muted sm">⏳ On its way: {pending.length} pending payment{pending.length === 1 ? '' : 's'} ({fmt(pending.reduce((t, p) => t + p.amount, 0))}). Counted once they clear.</p>}
           <div className="inline-row wrap">
             <button className="btn primary" disabled={!!busy} onClick={() => connect()}>{busy === 'connect' ? 'Waiting for your bank…' : conns.length ? 'Connect another bank' : 'Connect a bank'}</button>

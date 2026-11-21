@@ -246,7 +246,12 @@ async function withDialog(fn) {
 }
 
 function registerIpc() {
-  const handle = (ch, fn) => ipcMain.handle(ch, (_e, ...args) => fn(...args));
+  const handle = (ch, fn) => ipcMain.handle(ch, async (_e, ...args) => {
+    try { return await fn(...args); } catch (err) {
+      if (/^(bank|monzo|truelayer):/.test(ch) && !/cancelled/i.test(err?.message || '')) log(`[${ch}] failed:`, err?.message || String(err));
+      throw err;
+    }
+  });
   handle('state:get', () => store.get());
   handle('state:dispatch', (action) => dispatch(action));
 

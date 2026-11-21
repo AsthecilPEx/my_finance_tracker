@@ -110,7 +110,16 @@ export class TrueLayerConnector {
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = {}; }
-    if (!res.ok) throw new TrueLayerError(data.error_description || data.error || `TrueLayer returned ${res.status}`, { status: res.status, code: data.error || '' });
+    if (!res.ok) {
+      const code = data.error || '';
+      const signIn = form.grant_type === 'authorization_code';
+      const message = code === 'invalid_client'
+        ? 'TrueLayer didn\'t accept your Client ID or secret. In TrueLayer\'s console switch to Live, create a new client secret under Settings, then in Pulse disconnect any banks, click Change client and paste both again.'
+        : signIn && code === 'invalid_grant'
+          ? 'Your bank sign-in finished, but its one-time code was already used or expired before Pulse could use it. Click Connect a bank and try again.'
+          : data.error_description || code || `TrueLayer returned ${res.status}`;
+      throw new TrueLayerError(message, { status: res.status, code });
+    }
     return data;
   }
 
