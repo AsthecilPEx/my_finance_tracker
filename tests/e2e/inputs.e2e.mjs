@@ -145,7 +145,7 @@ await win.getByRole('button', { name: /^Set up \(about 5 minutes\)$/ }).click();
 // A bank sign-in that never comes back (page timed out, tab closed) can be cancelled and started again.
 {
   await app.evaluate(({ shell }) => { shell.openExternal = async () => {}; }); // don't open a real browser
-  const tl = win.locator('.card', { hasText: 'Other UK banks' });
+  const tl = win.locator('.card', { hasText: 'Other banks: live sync' });
   await tl.getByLabel('Client ID').fill('pulsefinance-e2e123');
   await tl.getByLabel('Client secret').fill('x'.repeat(36));
   await tl.getByRole('button', { name: 'Save', exact: true }).click();
