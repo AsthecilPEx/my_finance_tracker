@@ -46,6 +46,11 @@ export function startReminders({ getState, notify, sent }) {
       const left = 90 - Math.floor((Date.now() - Date.parse(mz.approvedAt)) / 86400000);
       if (left <= 7 && left >= 0) once(`monzo-renew-${mz.approvedAt}`, 'Monzo access renews soon', `Monzo asks you to re-approve Pulse every 90 days (${left} day${left === 1 ? '' : 's'} left). Open Bank Sync → Monzo → Reconnect.`, 'connect');
     }
+    for (const c of state.settings.truelayer?.connections || []) {
+      if (c.needsReconnect || !c.consentExpiresAt) continue;
+      const left = Math.ceil((Date.parse(c.consentExpiresAt) - Date.now()) / 86400000);
+      if (left <= 7 && left > 0) once(`truelayer-renew-${c.id}-${c.consentExpiresAt}`, `${c.providerName} access renews soon`, `Banks ask you to renew Pulse's access every 90 days (${left} day${left === 1 ? '' : 's'} left). Open Bank Sync and click Renew next to ${c.providerName}.`, 'connect');
+    }
     for (const s of staleStatements(state, today)) {
       // Once per bank per week of staleness.
       once(`stale:${s.bank}:${Math.floor(s.days / 7)}`, `📄 Time for a new ${s.name} statement`, `Last imported ${s.days} days ago. ${s.howTo}`, 'connect');

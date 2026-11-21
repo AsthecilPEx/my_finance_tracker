@@ -138,9 +138,10 @@ await nav('Budgets & Caps'); await win.getByRole('button', { name: '+ New cap' }
 await win.getByLabel('Edit cap').first().click(); await checkInputs('Edit cap', '.modal'); await closeModal();
 await nav('Pay Planner'); await win.getByRole('button', { name: '+ New goal' }).click(); await checkInputs('New goal', '.modal'); await closeModal();
 await win.getByLabel('Edit goal').first().click(); await checkInputs('Edit goal', '.modal'); await closeModal();
-// Bank Sync: Monzo setup form, statement guides and the EU section.
+// Bank Sync: Monzo and TrueLayer setup forms, statement guides and the EU section.
 await nav('Bank Sync');
 await win.getByRole('button', { name: /Set up Monzo/ }).click(); await checkInputs('Bank Sync › Monzo setup');
+await win.getByRole('button', { name: /^Set up \(about 5 minutes\)$/ }).click(); await checkInputs('Bank Sync › TrueLayer setup');
 await win.getByText("Where's the download button for my bank?").click();
 await win.getByText(/EU \/ EEA banks/).click(); await checkInputs('Bank Sync › EU banks');
 // Edit a single payday from the calendar and check the change flows through.

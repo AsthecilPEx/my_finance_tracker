@@ -18,8 +18,9 @@ export default function Connect() {
       <header className="page-head"><div><h1>Bank Sync</h1><p className="muted">Bring your transactions in. Everything is read-only: Pulse can never move money.</p></div></header>
       <YourBanks />
       <MonzoConnect />
+      <TrueLayerConnect />
       <div className="card">
-        <div className="card-head"><h3>📄 Statements: Lloyds, HSBC, Barclays, Revolut and others</h3><span className="muted sm">Pulse recognises each bank's file automatically</span></div>
+        <div className="card-head"><h3>📄 Statements: for banks you haven't connected live</h3><span className="muted sm">Pulse recognises each bank's file automatically</span></div>
         <p className="muted">Download a statement (about 30 seconds). Pulse reads it, skips duplicates and reminds you when one is due.</p>
         <WatchFolder />
         <CsvImport />
@@ -39,8 +40,10 @@ function YourBanks() {
   const { state, today, fmt } = useApp();
   const mz = state.settings.monzo;
   const stale = new Set(staleStatements(state, today).map((x) => x.bank));
-  const rows = Object.entries(state.bankImports || {}).filter(([b]) => !(b === 'monzo' && mz.connected));
-  if (!mz.connected && !rows.length && !state.settings.bank.connected) return null;
+  const tl = state.settings.truelayer?.connections || [];
+  const liveIds = tl.map((c) => String(c.providerId || c.providerName).toLowerCase());
+  const rows = Object.entries(state.bankImports || {}).filter(([b]) => !(b === 'monzo' && mz.connected) && !liveIds.some((id) => id.includes(b)));
+  if (!mz.connected && !tl.length && !rows.length && !state.settings.bank.connected) return null;
   const ago = (iso) => { const d = daysBetween(iso.slice(0, 10), today); return d === 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`; };
   return (
     <div className="card">
@@ -54,6 +57,14 @@ function YourBanks() {
             <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}>● {mz.needsReconnect ? 'Reconnect' : mz.needsApproval ? 'Approve in app' : 'Live'}</span>
           </li>
         )}
+        {tl.map((c) => (
+          <li key={c.id} className="list-row">
+            <span aria-hidden>🔵</span>
+            <span className="grow"><b>{c.providerName}</b><small className="muted"> · live{c.lastSync ? ` · synced ${ago(c.lastSync)}` : ''}</small></span>
+            {(c.accounts || []).map((a) => { const b = (state.accounts || []).find((x) => x.id === `truelayer:${a.id}`); return b ? <span key={a.id} className="muted sm">{a.name}: <b>{fmt(b.balance)}</b></span> : null; })}
+            <span className={`badge ${c.needsReconnect ? 'upcoming' : 'done'}`}>● {c.needsReconnect ? 'Reconnect' : 'Live'}</span>
+          </li>
+        ))}
         {rows.map(([b, info]) => (
           <li key={b} className="list-row">
             <span aria-hidden>📄</span>
@@ -184,6 +195,89 @@ function MonzoConnect() {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** TrueLayer: live, read-only sync for other UK banks (Lloyds, HSBC, Barclays, Revolut…). */
+function TrueLayerConnect() {
+  const { state, notify, fmt } = useApp();
+  const tl = state.settings.truelayer || { connections: [], pending: [] };
+  const conns = tl.connections || [];
+  const [info, setInfo] = useState(null);
+  const [clientId, setClientId] = useState('');
+  const [secret, setSecret] = useState('');
+  const [busy, setBusy] = useState('');
+  const [pasteUrl, setPasteUrl] = useState('');
+  const [setup, setSetup] = useState(false);
+
+  useEffect(() => { if (isDesktop) api.truelayer.info().then(setInfo); }, [conns.length]);
+
+  const run = async (label, fn) => {
+    setBusy(label);
+    try { return await fn(); } catch (e) { notify(e.message || String(e), 'critical'); } finally { setBusy(''); }
+  };
+  const connect = (id) => run(id ? `re:${id}` : 'connect', async () => {
+    const r = await api.truelayer.connect(id);
+    notify(`${r.bank} connected: ${r.added} transactions imported`, 'good');
+  });
+  const pending = tl.pending || [];
+  const daysLeft = (c) => (c.consentExpiresAt ? Math.ceil((Date.parse(c.consentExpiresAt) - Date.now()) / 86400000) : null);
+  const waiting = busy === 'connect' || busy.startsWith('re:');
+
+  return (
+    <div className="card">
+      <div className="card-head"><h3>🔵 Other UK banks: live sync</h3><span className="muted sm">Lloyds, HSBC, Barclays, Revolut and more, through TrueLayer</span></div>
+      {!isDesktop ? <DesktopOnly /> : !info?.hasClient ? (
+        !setup ? <button className="btn primary" onClick={() => setSetup(true)}>Set up (about 5 minutes)</button> : (
+          <div className="steps">
+            <ol>
+              <li>Open <button className="linkish" onClick={() => api.openExternal('https://console.truelayer.com/')}>console.truelayer.com</button>, open your app and switch to <b>Live</b>.</li>
+              <li><b>Settings → Redirect URIs → Add:</b> <code className="copyable" title="Click to copy" onClick={() => { api.copyText(info?.redirectUrl || ''); notify('Copied', 'good'); }}>{info?.redirectUrl || 'http://localhost:47287/truelayer/callback'}</code></li>
+              <li><b>Settings → Client secrets → Add secret.</b> Copy it straight away into the box below.</li>
+              <li>Copy the <b>Client ID</b> from the <b>Overview</b> tab.</li>
+            </ol>
+            <p className="muted sm">Both are encrypted on this PC and only ever sent to TrueLayer.</p>
+            <div className="row2">
+              <Field label="Client ID"><input value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" spellCheck="false" /></Field>
+              <Field label="Client secret"><input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off" spellCheck="false" /></Field>
+            </div>
+            <button className="btn primary" disabled={!clientId || !secret || !!busy} onClick={() => run('client', async () => { setInfo(await api.truelayer.saveClient(clientId, secret)); setSecret(''); notify('Saved, encrypted on this PC', 'good'); })}>{busy === 'client' ? 'Saving…' : 'Save'}</button>
+          </div>
+        )
+      ) : (
+        <>
+          {conns.length > 0 && (
+            <ul className="list">
+              {conns.map((c) => {
+                const left = daysLeft(c);
+                return (
+                  <li key={c.id} className="list-row wrap">
+                    <span className="grow"><b>{c.providerName}</b><small className="muted"> · {c.needsReconnect ? 'needs reconnecting' : `synced ${c.lastSync ? new Date(c.lastSync).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}`}{left !== null && !c.needsReconnect ? ` · renew in ${Math.max(0, left)} days` : ''}</small></span>
+                    {(c.needsReconnect || (left !== null && left <= 7))
+                      ? <button className="btn primary sm" disabled={!!busy} onClick={() => connect(c.id)}>{busy === `re:${c.id}` ? 'Waiting for your bank…' : c.needsReconnect ? 'Reconnect' : 'Renew'}</button>
+                      : null}
+                    <button className="btn ghost sm danger" disabled={!!busy} onClick={() => run('dc', () => api.truelayer.disconnect(c.id))}>Disconnect</button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {pending.length > 0 && <p className="muted sm">⏳ On its way: {pending.length} pending payment{pending.length === 1 ? '' : 's'} ({fmt(pending.reduce((t, p) => t + p.amount, 0))}). Counted once they clear.</p>}
+          <div className="inline-row wrap">
+            <button className="btn primary" disabled={!!busy} onClick={() => connect()}>{busy === 'connect' ? 'Waiting for your bank…' : conns.length ? 'Connect another bank' : 'Connect a bank'}</button>
+            {conns.length > 0 && <button className="btn ghost" disabled={!!busy} onClick={() => run('sync', async () => { const r = await api.truelayer.sync(); notify(r.waiting && !r.added ? 'Already synced in the last 4 hours. Banks limit how often Pulse can check.' : `Synced: ${r.added} new transactions`, r.added ? 'good' : 'info'); })}>{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>}
+            {!conns.length && <button className="btn ghost sm" onClick={async () => { setInfo(await api.truelayer.saveClient('', '')); }}>Change client</button>}
+          </div>
+          {waiting && (
+            <div className="callout">
+              <p>Pick your bank in the browser, log in and approve. Pulse finishes by itself.</p>
+              <p className="muted sm">Approved on your phone and the browser didn't come back? Paste the address it ended on (it contains <code>code=</code>):</p>
+              <div className="inline-row"><input className="grow" value={pasteUrl} onChange={(e) => setPasteUrl(e.target.value)} placeholder="http://localhost:47287/truelayer/callback?code=…" /><button className="btn ghost" disabled={!pasteUrl} onClick={async () => { try { await api.truelayer.completeWithUrl(pasteUrl.trim()); setPasteUrl(''); } catch (e) { notify(e.message, 'critical'); } }}>Finish</button></div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

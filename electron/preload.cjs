@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld('pulse', {
     sync: () => invoke('bank:sync'),
     disconnect: () => invoke('bank:disconnect'),
   },
+  truelayer: {
+    info: () => invoke('truelayer:info'),
+    saveClient: (id, secret) => invoke('truelayer:saveClient', id, secret),
+    connect: (reconnectId) => invoke('truelayer:connect', reconnectId),
+    completeWithUrl: (url) => invoke('truelayer:completeWithUrl', url),
+    sync: () => invoke('truelayer:sync'),
+    disconnect: (id) => invoke('truelayer:disconnect', id),
+  },
   monzo: {
     info: () => invoke('monzo:info'),
     saveClient: (id, secret) => invoke('monzo:saveClient', id, secret),
