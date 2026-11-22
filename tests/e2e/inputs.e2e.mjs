@@ -74,7 +74,7 @@ const closeModal = async () => { if (await win.locator('.modal').count()) { awai
 // Onboarding (fresh install)
 await win.waitForSelector('.onboard-card');
 await checkInputs('Onboarding: You');
-await win.getByText("Let's go →").click();
+await win.getByRole('button', { name: "Let's go" }).click();
 await checkInputs('Onboarding: Pay (salary)');
 await win.getByText('Hourly rate').click(); await checkInputs('Onboarding: Pay (hourly)');
 await win.getByText('I know my take-home').click(); await checkInputs('Onboarding: Pay (take-home)');
@@ -84,13 +84,13 @@ await win.getByText('+ Add another income').click(); await checkInputs('Onboardi
 await win.getByText('Tax code, pension & deductions').click().catch(() => {});
 await win.getByText('+ Add deduction').click().catch(() => {});
 await checkInputs('Onboarding: tax & deductions');
-await win.getByText('Next →').click();
-for (const b of ['🏠 Rent / mortgage', '⚡ Gas & electricity']) await win.getByText(b).click();
+await win.getByRole('button', { name: 'Next', exact: true }).click();
+for (const b of ['Rent / mortgage', 'Gas & electricity']) await win.getByText(b).click();
 await checkInputs('Onboarding: Bills');
-await win.getByText('Next →').click();
+await win.getByRole('button', { name: 'Next', exact: true }).click();
 await checkInputs('Onboarding: Safety net');
-await win.getByText('Next →').click();
-await win.getByText('Open my dashboard →').click();
+await win.getByRole('button', { name: 'Next', exact: true }).click();
+await win.getByRole('button', { name: 'Open my dashboard' }).click();
 await win.waitForSelector('.hero');
 
 // Load demo data through the in-app confirm, then immediately type in Add income (the reported bug path)
@@ -122,7 +122,7 @@ await nav('Transactions');
 await win.locator('.txns .linkish').first().click(); await checkInputs('Edit transaction', '.modal'); await closeModal();
 await win.locator('label.switch.sm').nth(1).click(); await checkInputs('Split popup', '.modal');
 await win.getByText('Exact amount back').click(); await checkInputs('Split popup (exact)', '.modal'); await closeModal();
-await win.getByRole('button', { name: /🤝 Link/ }).first().click(); await checkInputs('Link repayment popup', '.modal'); await closeModal();
+await win.getByRole('button', { name: /^Link/ }).first().click(); await checkInputs('Link repayment popup', '.modal'); await closeModal();
 await win.getByRole('button', { name: /Itemise/ }).first().click(); await checkInputs('Receipt popup', '.modal');
 await win.getByRole('button', { name: '+ Add row' }).click(); await checkInputs('Receipt popup rows', '.modal'); await closeModal();
 await nav('Bills & Income'); await win.getByRole('button', { name: '+ Add recurring' }).click(); await checkInputs('Add recurring', '.modal');
@@ -163,20 +163,20 @@ await nav('Dashboard');
 await win.getByLabel('Next month').click();
 await win.locator('.cal-day.payday', { hasText: 'PAY' }).last().click();
 const leftBefore = await win.locator('.hero-num').innerText();
-await win.getByRole('button', { name: '✎ Edit' }).first().click();
+await win.getByRole('button', { name: 'Edit', exact: true }).first().click();
 await checkInputs('Edit payday popup', '.modal');
 await closeModal(); // discard the test typing (it also changed the date), then edit for real
-await win.getByRole('button', { name: '✎ Edit' }).first().click();
+await win.getByRole('button', { name: 'Edit', exact: true }).first().click();
 await win.locator('.modal input[type=number]').first().fill('1234.5');
 await win.locator('.modal input').filter({ hasNot: win.locator('[type]') }).last().fill('Test: 2 days unpaid').catch(() => {});
 await win.locator('.modal').getByRole('button', { name: 'Save', exact: true }).click();
 await win.waitForTimeout(300);
-const edited = await win.locator('.list-row', { hasText: '✎ edited' }).count();
+const edited = await win.locator('.list-row', { hasText: 'edited' }).count();
 const chipEdited = await win.locator('.chip.edited').count();
 const leftAfter = await win.locator('.hero-num').innerText();
 if (!edited || !chipEdited || leftAfter === leftBefore) results.fail.push(`Payday edit did not flow through (panel ${edited}, chip ${chipEdited}, left ${leftBefore} -> ${leftAfter})`);
 else results.ok++;
-await win.getByRole('button', { name: '✎ Edit' }).first().click();
+await win.getByRole('button', { name: 'Edit', exact: true }).first().click();
 await win.getByRole('button', { name: 'Reset to normal' }).click();
 await win.waitForTimeout(300);
 if ((await win.locator('.hero-num').innerText()) !== leftBefore) results.fail.push('Reset to normal did not restore the original amount');

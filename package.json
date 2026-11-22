@@ -1,7 +1,7 @@
 {
   "name": "pulse-finance",
   "productName": "Pulse Finance",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "A smart personal finance tracker for Windows: category meters, payday calendar, bills, debts, insights and a desktop widget.",
   "author": {
     "name": "Pulse Finance"
@@ -89,6 +89,8 @@
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
     "electron-updater": "^6.8.9",
+    "lucide-react": "^1.77.0",
+    "motion": "^14.14.0",
     "papaparse": "^5.7.0",
     "tesseract.js": "^7.0.0"
   },

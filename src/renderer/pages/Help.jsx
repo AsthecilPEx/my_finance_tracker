@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../store.jsx';
 import { api, isDesktop } from '../api.js';
 import { APP_VERSION, DOWNLOAD_URL } from '../../config.js';
+import { Icon } from '../components/Icon.jsx';
 
 const CHANGES = [
   { v: '0.4', items: ['Edit any single payday or bill from the calendar (amount, hours worked, date, skip)', 'Automatic updates', 'Help & feedback', 'Friendlier error screen', 'Fix: text boxes not accepting typing on Windows'] },
@@ -44,7 +45,7 @@ export default function Help() {
       <header className="page-head"><div><h1>Help & feedback</h1><p className="muted">Pulse Finance {APP_VERSION}</p></div></header>
 
       <div className="card">
-        <h3>🚀 Getting started in 5 minutes</h3>
+        <h3><Icon name="Rocket" />Getting started in 5 minutes</h3>
         <ol className="steps-list">
           <li><b>Tell Pulse how you're paid.</b> Settings → Profile & Pay. Your paydays appear on the calendar.</li>
           <li><b>Add your regular bills</b> on Bills & Income: rent, council tax, phone, subscriptions.</li>
@@ -55,17 +56,17 @@ export default function Help() {
       </div>
 
       <div className="card">
-        <h3>❓ Common questions</h3>
+        <h3><Icon name="CircleHelp" />Common questions</h3>
         <div className="faq">
           {FAQ.map(([q, a]) => <details key={q}><summary>{q}</summary><p>{a}</p></details>)}
         </div>
       </div>
 
       <div className="card">
-        <h3>💬 Send feedback or report a problem</h3>
+        <h3><Icon name="MessageCircle" />Send feedback or report a problem</h3>
         <div className="seg">
-          <button className={kind === 'idea' ? 'on in' : ''} onClick={() => setKind('idea')}>💡 Idea or feedback</button>
-          <button className={kind === 'bug' ? 'on out' : ''} onClick={() => setKind('bug')}>🐞 Something's wrong</button>
+          <button className={kind === 'idea' ? 'on in' : ''} onClick={() => setKind('idea')}><Icon name="Lightbulb" /> Idea or feedback</button>
+          <button className={kind === 'bug' ? 'on out' : ''} onClick={() => setKind('bug')}><Icon name="Bug" /> Something's wrong</button>
         </div>
         <textarea rows={5} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder={kind === 'bug' ? 'What happened, and what were you doing just before?' : 'What would make Pulse more useful for you?'} />
         <p className="muted xs">This opens your email app with the message ready. {kind === 'bug' ? 'It adds the app version and recent error messages (never your financial data). You can read everything before sending.' : 'It adds the app version.'}</p>
@@ -73,7 +74,7 @@ export default function Help() {
       </div>
 
       <div className="card">
-        <h3>🤝 Share Pulse with a friend</h3>
+        <h3><Icon name="Share2" />Share Pulse with a friend</h3>
         <p className="muted">Send them this link. It always points to the latest version.</p>
         <div className="inline-row">
           <input readOnly value={DOWNLOAD_URL} className="grow" onFocus={(e) => e.target.select()} />

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../store.jsx';
 import { api } from '../api.js';
 import { buildPrompt, parsePlan, diffPlan } from '../../engine/aiplan.js';
+import { Icon } from '../components/Icon.jsx';
 
 export default function AIPlan() {
   const { state, today, fmt, dispatch, notify } = useApp();
@@ -48,7 +49,7 @@ export default function AIPlan() {
           <textarea rows={4} value={situation} onChange={(e) => setSituation(e.target.value)} placeholder="e.g. I'm paid weekly on zero-hours, rent is due on the 1st and I always struggle that week. I want to clear my credit card by summer and save for a deposit." />
           <p className="muted sm">Includes a summary of your finances; leaves out your name, accounts and transactions.</p>
           <div className="inline-row wrap">
-            <button className="btn primary" onClick={copy}>📋 Copy prompt</button>
+            <button className="btn primary" onClick={copy}><Icon name="Copy" /> Copy prompt</button>
             <button className="btn ghost" onClick={() => api.saveText(prompt, 'pulse-ai-prompt.txt')}>Save as file</button>
             <button className="linkish muted" onClick={() => setShowPrompt((x) => !x)}>{showPrompt ? 'Hide' : 'Preview'} prompt</button>
           </div>
@@ -73,7 +74,7 @@ export default function AIPlan() {
             <button className="btn primary" disabled={!reply.trim()} onClick={() => check()}>Check plan</button>
             <button className="btn ghost" onClick={openFile}>Open a saved reply…</button>
           </div>
-          {result?.errors?.length > 0 && <div className="callout bad">{result.errors.map((e) => <div key={e}>⚠ {e}</div>)}</div>}
+          {result?.errors?.length > 0 && <div className="callout bad">{result.errors.map((e) => <div key={e}><Icon name="TriangleAlert" /> {e}</div>)}</div>}
           {result?.plan && (
             <div className="plan-preview">
               <h3>{result.plan.title}</h3>
@@ -105,7 +106,7 @@ export default function AIPlan() {
           <ul className="list">
             {state.planHistory.map((h) => (
               <li key={h.id} className="list-row">
-                <span className="grow"><b>{h.title}</b><small className="muted"> · {new Date(h.appliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {h.changes} changes{h.undone ? ' · undone' : ''}{h.superseded ? ' · replaced by a newer version' : ''}</small>{h.tips?.length > 0 && <div className="muted sm">💡 {h.tips[0]}</div>}</span>
+                <span className="grow"><b>{h.title}</b><small className="muted"> · {new Date(h.appliedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {h.changes} changes{h.undone ? ' · undone' : ''}{h.superseded ? ' · replaced by a newer version' : ''}</small>{h.tips?.length > 0 && <div className="muted sm"><Icon name="Lightbulb" /> {h.tips[0]}</div>}</span>
                 {!h.undone && h.before && <button className="btn ghost sm" onClick={() => { dispatch({ type: 'plan/undo', payload: { id: h.id } }); notify('Plan undone: budgets, caps, goals and pauses restored', 'good'); }}>Undo</button>}
               </li>
             ))}

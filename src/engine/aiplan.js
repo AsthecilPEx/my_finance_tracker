@@ -1,3 +1,4 @@
+import { iconName } from './icons.js';
 // "Bring your own AI": export a prompt that describes the user's finances plus a strict
 // JSON contract (Pulse Plan v1). Any assistant can fill it in; the app validates the reply,
 // shows a change-by-change preview, and applies only what the user ticks (with undo).
@@ -27,7 +28,7 @@ export function planSchemaExample(state) {
     budgets: [{ category: 'groceries', monthly: 320 }],
     caps: [{ name: 'Treats cap', scope: 'tier', tier: 'low', section: 'groceries', amount: 30, period: 'month', alertAt: 0.8 }],
     capsMode: 'merge',
-    goals: [{ name: 'Emergency fund', icon: '🛟', target: 1500, saved: 0, targetDate: '2027-06-30', perMonth: 125 }],
+    goals: [{ name: 'Emergency fund', icon: 'LifeBuoy', target: 1500, saved: 0, targetDate: '2027-06-30', perMonth: 125 }],
     debtPlan: { strategy: 'avalanche', extraPerMonth: 100 },
     pauseRecurring: ['Disney+'],
     billPot: { enabled: true },
@@ -149,7 +150,7 @@ export function parsePlan(text, state) {
   for (const g of Array.isArray(raw.goals) ? raw.goals : []) {
     const target = num(g?.target, `goal "${g?.name}" target`, { min: 1 });
     if (!str(g?.name) || target === null) continue;
-    plan.goals.push({ id: (state.goals || []).some((x) => x.id === g.id) ? g.id : undefined, name: str(g.name, 60), icon: str(g.icon, 4) || '🎯', target, saved: num(g.saved ?? 0, 'goal saved') || 0, targetDate: date(g.targetDate), perMonth: num(g.perMonth ?? 0, `goal "${g.name}" monthly amount`) || 0 });
+    plan.goals.push({ id: (state.goals || []).some((x) => x.id === g.id) ? g.id : undefined, name: str(g.name, 60), icon: iconName(str(g.icon, 40), 'Target'), target, saved: num(g.saved ?? 0, 'goal saved') || 0, targetDate: date(g.targetDate), perMonth: num(g.perMonth ?? 0, `goal "${g.name}" monthly amount`) || 0 });
   }
   if (raw.debtPlan) {
     const strategy = raw.debtPlan.strategy === 'snowball' ? 'snowball' : 'avalanche';
@@ -179,7 +180,7 @@ export function diffPlan(state, plan, fmt = (n) => String(n)) {
   const changes = [];
   for (const b of plan.budgets) {
     const before = cats[b.categoryId]?.budget || 0;
-    if (before !== b.monthly) changes.push({ id: `budget:${b.categoryId}`, group: 'Budgets', text: `${cats[b.categoryId].icon} ${cats[b.categoryId].name}: ${before ? fmt(before) : 'no budget'} → ${b.monthly ? fmt(b.monthly) : 'no budget'}` });
+    if (before !== b.monthly) changes.push({ id: `budget:${b.categoryId}`, group: 'Budgets', text: `${cats[b.categoryId].name}: ${before ? fmt(before) : 'no budget'} → ${b.monthly ? fmt(b.monthly) : 'no budget'}` });
   }
   plan.caps.forEach((c, i) => {
     const prev = findExisting(state.caps, c);
@@ -189,7 +190,7 @@ export function diffPlan(state, plan, fmt = (n) => String(n)) {
     const kept = new Set(plan.caps.map((c) => findExisting(state.caps, c)?.id).filter(Boolean));
     for (const c of state.caps || []) if (!kept.has(c.id)) changes.push({ id: `capdel:${c.id}`, group: 'Spend caps', text: `Remove cap "${c.name}"` });
   }
-  plan.goals.forEach((g, i) => changes.push({ id: `goal:${i}`, group: 'Savings goals', text: `${findExisting(state.goals, g) ? 'Update' : 'New'} goal ${g.icon} ${g.name}: ${fmt(g.target)}${g.perMonth ? `, saving ${fmt(g.perMonth)}/month` : ''}${g.targetDate ? ` by ${g.targetDate}` : ''}` }));
+  plan.goals.forEach((g, i) => changes.push({ id: `goal:${i}`, group: 'Savings goals', text: `${findExisting(state.goals, g) ? 'Update' : 'New'} goal ${g.name}: ${fmt(g.target)}${g.perMonth ? `, saving ${fmt(g.perMonth)}/month` : ''}${g.targetDate ? ` by ${g.targetDate}` : ''}` }));
   if (plan.debtPlan) changes.push({ id: 'debt', group: 'Debts', text: `Debt strategy: ${plan.debtPlan.strategy}${plan.debtPlan.extra ? ` with ${fmt(plan.debtPlan.extra)}/month extra` : ''}` });
   for (const n of plan.pauseRecurring) changes.push({ id: `pause:${n.toLowerCase()}`, group: 'Recurring', text: `Pause "${n}"` });
   if (plan.billPot) changes.push({ id: 'billpot', group: 'Pay planner', text: `${plan.billPot.enabled ? 'Use' : 'Stop using'} a bills pot for each payday` });

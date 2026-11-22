@@ -5,6 +5,7 @@ import { PAY_PATTERNS, WEEKDAYS, incomeItems, nextWeekday } from '../../engine/i
 import { takeHome, TAX_YEAR } from '../../engine/payroll.js';
 import { occurrencesBetween } from '../../engine/recurring.js';
 import { addDays, parseISO, shortDate, weekdayShort } from '../../engine/dates.js';
+import { Icon } from './Icon.jsx';
 
 /** Edit one income source. Shows the take-home breakdown and upcoming paydays as you type. */
 export default function IncomeEditor({ value, onChange, region = 'ruk' }) {
@@ -73,7 +74,7 @@ export default function IncomeEditor({ value, onChange, region = 'ruk' }) {
 
         {inc.payType !== 'net' && (
           <div className="collapsible">
-            <button type="button" className="linkish muted" onClick={() => setShowTax((x) => !x)}>{showTax ? '▾' : '▸'} Tax code, pension & deductions</button>
+            <button type="button" className="linkish muted" onClick={() => setShowTax((x) => !x)}><Icon name={showTax ? 'ChevronDown' : 'ChevronRight'} /> Tax code, pension & deductions</button>
             {showTax && (
               <div className="collapsible-body">
                 <div className="row2">
@@ -134,7 +135,7 @@ function IrregularDates({ inc, set }) {
         <div key={i} className="inline-row">
           <input type="date" value={r.date} onChange={(e) => upd(i, { date: e.target.value })} />
           <input type="number" min="0" step="0.01" placeholder="Amount" value={r.amount} onChange={(e) => upd(i, { amount: e.target.value })} />
-          <button type="button" className="icon-btn danger" aria-label="Remove" onClick={() => set({ irregularDates: rows.filter((_, j) => j !== i) })}>✕</button>
+          <button type="button" className="icon-btn danger" aria-label="Remove" onClick={() => set({ irregularDates: rows.filter((_, j) => j !== i) })}><Icon name="X" /></button>
         </div>
       ))}
       <button type="button" className="btn ghost sm" onClick={() => set({ irregularDates: [...rows, { date: '', amount: '' }] })}>+ Add a payment date</button>
@@ -153,7 +154,7 @@ function Deductions({ inc, set }) {
           <input type="number" min="0" step="0.01" placeholder="Amount" value={r.amount} onChange={(e) => upd(i, { amount: e.target.value })} style={{ width: 100 }} />
           <select value={r.per || 'pay'} onChange={(e) => upd(i, { per: e.target.value })}><option value="pay">per pay</option><option value="month">per month</option><option value="year">per year</option></select>
           <label className="check inline"><input type="checkbox" checked={!!r.beforeTax} onChange={(e) => upd(i, { beforeTax: e.target.checked })} /><span>before tax</span></label>
-          <button type="button" className="icon-btn danger" aria-label="Remove" onClick={() => set({ deductions: rows.filter((_, j) => j !== i) })}>✕</button>
+          <button type="button" className="icon-btn danger" aria-label="Remove" onClick={() => set({ deductions: rows.filter((_, j) => j !== i) })}><Icon name="X" /></button>
         </div>
       ))}
       <button type="button" className="btn ghost sm" onClick={() => set({ deductions: [...rows, { name: '', amount: '', per: 'pay', beforeTax: false }] })}>+ Add deduction</button>

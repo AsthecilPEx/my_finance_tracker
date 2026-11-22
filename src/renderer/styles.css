@@ -622,3 +622,17 @@ ul.tidy li { margin: 2px 0; }
 .history-row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .history-row:last-child { border-bottom: 0; }
 @media (max-width: 520px) { .history-row { grid-template-columns: 1fr auto; } .history-row > :first-child { grid-column: 1 / -1; } }
+
+/* Icons (lucide-react). Sizes follow CLAUDE.md; these few utilities stand in for Tailwind's. */
+.icon { display: inline-block; flex-shrink: 0; vertical-align: -0.15em; }
+.w-4 { width: 1rem; } .h-4 { height: 1rem; }
+.w-5 { width: 1.25rem; } .h-5 { height: 1.25rem; }
+.w-8 { width: 2rem; } .h-8 { height: 2rem; }
+.animate-spin { animation: spin 1s linear infinite; }
+.icon-pop { display: inline-flex; }
+.status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; }
+.icon-label { display: inline-flex; align-items: center; gap: 6px; }
+h2 .icon, h3 .icon, h4 .icon { margin-right: 6px; color: var(--text-2); }
+button .icon + span, button .icon:not(:only-child) { margin-right: 6px; }
+.brand-monzo { color: #ff7a59; }
+.brand-other { color: var(--accent); }

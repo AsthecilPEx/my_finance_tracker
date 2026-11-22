@@ -4,6 +4,7 @@ import { monthSummary } from '../../engine/summary.js';
 import { parseISO } from '../../engine/dates.js';
 import { PALETTE } from '../../engine/categories.js';
 import { CapList } from '../components/Caps.jsx';
+import { Icon } from '../components/Icon.jsx';
 
 const TYPES = { essential: 'Essential', lifestyle: 'Lifestyle', debt: 'Debt', savings: 'Savings', transfer: 'Transfer (ignored)', income: 'Income' };
 
@@ -42,7 +43,7 @@ export default function Budgets() {
           <tbody>
             {state.categories.map((c) => (
               <tr key={c.id}>
-                <td><span className="cat-name"><span aria-hidden>{c.icon}</span>{c.name}</span></td>
+                <td><span className="cat-name"><Icon name={c.icon} />{c.name}</span></td>
                 <td>
                   <select value={c.type} onChange={(e) => save(c, { type: e.target.value })}>
                     {Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -72,7 +73,7 @@ export default function Budgets() {
             {state.rules.map((r) => (
               <li key={r.id} className="list-row">
                 <span className="grow">"{r.merchant || r.pattern}" → {state.categories.find((c) => c.id === r.categoryId)?.name}</span>
-                <button className="icon-btn danger" aria-label="Delete rule" onClick={() => dispatch({ type: 'rule/delete', payload: { id: r.id } })}>✕</button>
+                <button className="icon-btn danger" aria-label="Delete rule" onClick={() => dispatch({ type: 'rule/delete', payload: { id: r.id } })}><Icon name="X" /></button>
               </li>
             ))}
           </ul>

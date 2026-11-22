@@ -4,11 +4,12 @@ import Modal from './Modal.jsx';
 import { Field, CategorySelect } from './Forms.jsx';
 import { CAP_PERIODS, evaluateCaps } from '../../engine/caps.js';
 import { TIERS, SECTIONS } from '../../engine/receipts.js';
+import { Icon } from './Icon.jsx';
 
 const STATUS = {
-  ok: { icon: '✓', label: 'On track', color: 'var(--good)' },
-  near: { icon: '◐', label: 'Nearing cap', color: 'var(--warning)' },
-  over: { icon: '⚠', label: 'Over cap', color: 'var(--critical)' },
+  ok: { icon: 'CircleCheck', label: 'On track', color: 'var(--good)' },
+  near: { icon: 'Contrast', label: 'Nearing cap', color: 'var(--warning)' },
+  over: { icon: 'TriangleAlert', label: 'Over cap', color: 'var(--critical)' },
 };
 
 export function CapList({ compact = false }) {
@@ -18,7 +19,7 @@ export function CapList({ compact = false }) {
   const list = compact ? caps.filter((c) => c.status !== 'ok') : caps;
   return (
     <>
-      {!compact && <div className="card-head"><h3>🚦 Spend caps</h3><button className="btn ghost sm" onClick={() => setEdit({ scope: 'tier', tier: 'low', section: 'groceries', amount: '', period: 'month', alertAt: 0.8, name: '' })}>+ New cap</button></div>}
+      {!compact && <div className="card-head"><h3><Icon name="Gauge" />Spend caps</h3><button className="btn ghost sm" onClick={() => setEdit({ scope: 'tier', tier: 'low', section: 'groceries', amount: '', period: 'month', alertAt: 0.8, name: '' })}>+ New cap</button></div>}
       {!compact && list.length === 0 && <p className="empty">Caps warn you before you overspend. Try one on "not so important" groceries or eating out.</p>}
       <ul className="caps">
         {list.map((c) => {
@@ -27,8 +28,8 @@ export function CapList({ compact = false }) {
             <li key={c.cap.id} className={`cap ${c.status}`}>
               <div className="cap-head">
                 <b>{c.label}</b>
-                <span className="cap-status" style={{ color: s.color }}><i aria-hidden>{s.icon}</i> {s.label}</span>
-                {!compact && <button className="icon-btn" aria-label="Edit cap" onClick={() => setEdit(c.cap)}>✎</button>}
+                <span className="cap-status" style={{ color: s.color }}><Icon name={s.icon} /> {s.label}</span>
+                {!compact && <button className="icon-btn" aria-label="Edit cap" onClick={() => setEdit(c.cap)}><Icon name="Pencil" /></button>}
               </div>
               <div className="cap-track"><span style={{ width: `${Math.min(100, c.pct * 100)}%`, background: s.color }} /><i style={{ left: `${(c.cap.alertAt ?? 0.8) * 100}%` }} title="Alert threshold" /></div>
               <div className="cap-meta muted sm">
@@ -79,7 +80,7 @@ function CapModal({ cap, onClose }) {
           <Field label="Section">
             <select value={c.section || ''} onChange={set('section')}>
               {c.scope === 'tier' && <option value="">All sections</option>}
-              {Object.entries(SECTIONS).map(([k, s]) => <option key={k} value={k}>{s.icon} {s.label}</option>)}
+              {Object.entries(SECTIONS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
             </select>
           </Field>
         )}

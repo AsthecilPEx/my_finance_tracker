@@ -6,6 +6,7 @@ import { staleStatements } from '../../engine/freshness.js';
 import { daysBetween } from '../../engine/dates.js';
 import { categorise } from '../../engine/categories.js';
 import { Field } from '../components/Forms.jsx';
+import { Icon, Dot } from '../components/Icon.jsx';
 
 // Enable Banking's free personal ("restricted") mode covers EU/EEA banks only, not the UK.
 const COUNTRIES = { IE: 'Ireland', DE: 'Germany', FR: 'France', ES: 'Spain', IT: 'Italy', NL: 'Netherlands', BE: 'Belgium', PT: 'Portugal', AT: 'Austria', FI: 'Finland', SE: 'Sweden', DK: 'Denmark', PL: 'Poland' };
@@ -20,13 +21,13 @@ export default function Connect() {
       <MonzoConnect />
       <TrueLayerConnect />
       <div className="card">
-        <div className="card-head"><h3>📄 Statements: for banks you haven't connected live</h3><Info>Download a statement (about 30 seconds). Pulse recognises each bank's file, skips duplicates and reminds you when one is due.</Info></div>
+        <div className="card-head"><h3><Icon name="FileText" />Statements: for banks you haven't connected live</h3><Info>Download a statement (about 30 seconds). Pulse recognises each bank's file, skips duplicates and reminds you when one is due.</Info></div>
         <WatchFolder />
         <CsvImport />
         <BankGuides />
       </div>
       <div className="card">
-        <button className="linkish card-head" onClick={() => setEu((x) => !x)}><h3>{eu ? '▾' : '▸'} 🇪🇺 EU / EEA banks (Enable Banking)</h3></button>
+        <button className="linkish card-head" onClick={() => setEu((x) => !x)}><h3><Icon name={eu ? 'ChevronDown' : 'ChevronRight'} /><Icon name="Globe" />EU / EEA banks (Enable Banking)</h3></button>
         {eu && <OpenBanking />}
       </div>
       <ImportHistory />
@@ -50,25 +51,25 @@ function YourBanks() {
       <ul className="list">
         {mz.connected && (
           <li className="list-row">
-            <span aria-hidden>🟠</span>
+            <Icon name="Landmark" className="brand-monzo" />
             <span className="grow"><b>Monzo</b><small className="muted"> · live{mz.lastSync ? ` · synced ${ago(mz.lastSync)}` : ''}</small></span>
             {(state.accounts || []).filter((a) => a.source === 'monzo').map((a) => <span key={a.id} className="muted sm">{a.name}: <b>{fmt(a.balance)}</b></span>)}
-            <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}>● {mz.needsReconnect ? 'Reconnect' : mz.needsApproval ? 'Approve in app' : 'Live'}</span>
+            <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}><Dot />{mz.needsReconnect ? 'Reconnect' : mz.needsApproval ? 'Approve in app' : 'Live'}</span>
           </li>
         )}
         {tl.map((c) => (
           <li key={c.id} className="list-row">
-            <span aria-hidden>🔵</span>
+            <Icon name="Building2" className="brand-other" />
             <span className="grow"><b>{c.providerName}</b><small className="muted"> · live{c.lastSync ? ` · synced ${ago(c.lastSync)}` : ''}</small></span>
             {(c.accounts || []).map((a) => { const b = (state.accounts || []).find((x) => x.id === `truelayer:${a.id}`); return b ? <span key={a.id} className="muted sm">{a.name}: <b>{fmt(b.balance)}</b></span> : null; })}
-            <span className={`badge ${c.needsReconnect ? 'upcoming' : 'done'}`}>● {c.needsReconnect ? 'Reconnect' : 'Live'}</span>
+            <span className={`badge ${c.needsReconnect ? 'upcoming' : 'done'}`}><Dot />{c.needsReconnect ? 'Reconnect' : 'Live'}</span>
           </li>
         ))}
         {rows.map(([b, info]) => (
           <li key={b} className="list-row">
-            <span aria-hidden>📄</span>
+            <Icon name="FileText" />
             <span className="grow"><b>{BANK_FORMATS[b]?.name || b}</b><small className="muted"> · statement imported {ago(info.at)}{info.latest ? ` · newest payment ${info.latest}` : ''}</small></span>
-            <span className={`badge ${stale.has(b) ? 'upcoming' : 'done'}`}>● {stale.has(b) ? 'Time for a new one' : 'Up to date'}</span>
+            <span className={`badge ${stale.has(b) ? 'upcoming' : 'done'}`}><Dot />{stale.has(b) ? 'Time for a new one' : 'Up to date'}</span>
           </li>
         ))}
       </ul>
@@ -80,7 +81,7 @@ function BankGuides() {
   const [open, setOpen] = useState(false);
   return (
     <div className="sub-section">
-      <button className="linkish" onClick={() => setOpen((x) => !x)}>{open ? '▾' : '▸'} Where's the download button for my bank?</button>
+      <button className="linkish" onClick={() => setOpen((x) => !x)}><Icon name={open ? 'ChevronDown' : 'ChevronRight'} /> Where's the download button for my bank?</button>
       {open && (
         <ul className="list compact guides">
           {Object.entries(BANK_FORMATS).map(([id, f]) => <li key={id} className="list-row"><b className="nowrap">{f.name}</b><span className="muted sm grow">{f.howTo}</span></li>)}
@@ -134,10 +135,10 @@ function MonzoConnect() {
 
   return (
     <div className="card">
-      <div className="card-head"><h3>🟠 Monzo: live sync</h3><span className="head-right">{mz.connected && <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}>● {mz.needsReconnect ? 'Needs reconnecting' : mz.needsApproval ? 'Waiting for approval' : 'Connected'}</span>}<Info>Free, read-only live sync for your current, joint and Flex accounts.</Info></span></div>
+      <div className="card-head"><h3><Icon name="Landmark" className="brand-monzo" />Monzo: live sync</h3><span className="head-right">{mz.connected && <span className={`badge ${mz.needsApproval || mz.needsReconnect ? 'upcoming' : 'done'}`}><Dot />{mz.needsReconnect ? 'Needs reconnecting' : mz.needsApproval ? 'Waiting for approval' : 'Connected'}</span>}<Info>Free, read-only live sync for your current, joint and Flex accounts.</Info></span></div>
       {!isDesktop ? <DesktopOnly /> : mz.connected && mz.needsApproval ? (
         <div className="callout">
-          <p><b>📱 Approve "Pulse Finance" in the Monzo app on your phone.</b></p>
+          <p><b><Icon name="Smartphone" /> Approve "Pulse Finance" in the Monzo app on your phone.</b></p>
           <ul className="tidy muted sm"><li>Pulse checks automatically.</li><li>Approve within 5 minutes to get your full history (otherwise 90 days).</li></ul>
           <div className="inline-row"><button className="btn primary" disabled={!!busy} onClick={() => run('check', async () => { const r = await api.monzo.checkApproval(); if (!r.approved) notify("Not approved yet. Check the Monzo app.", 'info'); else notify(`Monzo approved: ${r.added} transactions imported`, 'good'); })}>{busy === 'check' ? 'Checking…' : "I've approved it"}</button><button className="btn ghost" onClick={() => run('dc', () => api.monzo.disconnect())}>Cancel</button></div>
         </div>
@@ -145,7 +146,7 @@ function MonzoConnect() {
         <>
           {mz.needsReconnect && <div className="callout warn"><p><b>Monzo needs you to approve Pulse again</b> (every 90 days). Click Reconnect, open the email link on this PC, then approve in the app.</p></div>}
           <ul className="list">
-            {accounts.map((a) => <li key={a.id} className="list-row"><span aria-hidden>{a.kind === 'credit' ? '💳' : '🏦'}</span><span className="grow"><b>{a.name}</b>{a.kind === 'credit' && <small className="muted"> · amount owed</small>}</span><b>{fmt(a.balance)}</b></li>)}
+            {accounts.map((a) => <li key={a.id} className="list-row"><Icon name={a.kind === 'credit' ? 'CreditCard' : 'Landmark'} /><span className="grow"><b>{a.name}</b>{a.kind === 'credit' && <small className="muted"> · amount owed</small>}</span><b>{fmt(a.balance)}</b></li>)}
           </ul>
           <div className="inline-row wrap">
             <span className="muted grow">Last synced: {mz.lastSync ? new Date(mz.lastSync).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'never'}{daysLeft !== null ? ` · re-approve in ${Math.max(0, daysLeft)} days` : ''}</span>
@@ -235,7 +236,7 @@ function TrueLayerConnect() {
 
   return (
     <div className="card">
-      <div className="card-head"><h3>🔵 Other banks: live sync</h3><span className="head-right">{conns.length > 0 && <span className={`badge ${conns.some((c) => c.needsReconnect) ? 'upcoming' : 'done'}`}>● {conns.some((c) => c.needsReconnect) ? 'Needs reconnecting' : 'Connected'}</span>}<Info>Lloyds, HSBC, Barclays, Revolut and more, read-only through TrueLayer.</Info></span></div>
+      <div className="card-head"><h3><Icon name="Building2" className="brand-other" />Other banks: live sync</h3><span className="head-right">{conns.length > 0 && <span className={`badge ${conns.some((c) => c.needsReconnect) ? 'upcoming' : 'done'}`}><Dot />{conns.some((c) => c.needsReconnect) ? 'Needs reconnecting' : 'Connected'}</span>}<Info>Lloyds, HSBC, Barclays, Revolut and more, read-only through TrueLayer.</Info></span></div>
       {!isDesktop ? <DesktopOnly /> : !info?.hasClient ? (
         !setup ? <button className="btn primary" onClick={() => setSetup(true)}>Set up (about 5 minutes)</button> : (
           <div className="steps">
@@ -272,7 +273,7 @@ function TrueLayerConnect() {
             </ul>
           )}
           {problem && <div className="callout warn"><p><b>That bank didn't connect.</b> {problem}</p></div>}
-          {pending.length > 0 && <p className="muted sm">⏳ Pending: {pending.length} pending payment{pending.length === 1 ? '' : 's'} ({fmt(pending.reduce((t, p) => t + p.amount, 0))})</p>}
+          {pending.length > 0 && <p className="muted sm"><Icon name="Hourglass" /> Pending: {pending.length} pending payment{pending.length === 1 ? '' : 's'} ({fmt(pending.reduce((t, p) => t + p.amount, 0))})</p>}
           <div className="inline-row wrap">
             <button className="btn primary" disabled={!!busy} onClick={() => connect()}>{busy === 'connect' ? 'Waiting for your bank…' : conns.length ? 'Connect another bank' : 'Connect a bank'}</button>
             {conns.length > 0 && <button className="btn ghost" disabled={!!busy} onClick={() => run('sync', async () => { const r = await api.truelayer.sync(); notify(r.waiting && !r.added ? 'Already synced in the last 4 hours. Banks limit how often Pulse can check.' : `Synced: ${r.added} new transactions`, r.added ? 'good' : 'info'); })}>{busy === 'sync' ? 'Syncing…' : 'Sync now'}</button>}
@@ -303,6 +304,8 @@ function Info({ children }) {
   );
 }
 
+const HISTORY_ICON = { bank: 'Landmark', truelayer: 'Building2', monzo: 'Landmark', watch: 'FolderOpen', demo: 'Sparkles' };
+
 function ImportHistory() {
   const { state } = useApp();
   if (!state.imports?.length) return null;
@@ -313,7 +316,7 @@ function ImportHistory() {
         {state.imports.slice(0, 12).map((i) => (
           <li key={i.id} className="history-row">
             <span className="muted nowrap">{new Date(i.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-            <span>{i.source === 'bank' ? '🏦 Bank sync' : i.source === 'monzo' ? '🟠 Monzo sync' : i.source === 'truelayer' ? '🔵 Bank sync' : i.source === 'watch' ? '📂 Watched folder' : i.source === 'demo' ? 'Demo data' : '📄 Statement file'}{i.bank && BANK_FORMATS[i.bank] ? ` · ${BANK_FORMATS[i.bank].name}` : ''} {i.fileName && <span className="muted">· {i.fileName}</span>}</span>
+            <span>{<span className="icon-label"><Icon name={HISTORY_ICON[i.source] || 'FileText'} className={i.source === 'monzo' ? 'brand-monzo' : i.source === 'truelayer' ? 'brand-other' : ''} />{i.source === 'bank' || i.source === 'truelayer' ? 'Bank sync' : i.source === 'monzo' ? 'Monzo sync' : i.source === 'watch' ? 'Watched folder' : i.source === 'demo' ? 'Demo data' : 'Statement file'}</span>}{i.bank && BANK_FORMATS[i.bank] ? ` · ${BANK_FORMATS[i.bank].name}` : ''} {i.fileName && <span className="muted">· {i.fileName}</span>}</span>
             <span className="nowrap">{i.added} added{i.duplicates ? <span className="muted"> · {i.duplicates} already had</span> : ''}</span>
           </li>
         ))}
@@ -357,10 +360,10 @@ function CsvImport() {
 
   return (
     <div className="sub-section">
-      <h4>📄 Import a statement now</h4>
+      <h4><Icon name="FileText" />Import a statement now</h4>
       <p className="muted sm">Choose a CSV you've downloaded. Anything already in Pulse is skipped, so overlapping dates are fine.</p>
       <button className="btn ghost" onClick={pick}>Choose CSV file…</button>
-      {preview?.error && <p className="error">⚠ {preview.error}</p>}
+      {preview?.error && <p className="error"><Icon name="TriangleAlert" /> {preview.error}</p>}
       {preview?.rows && (
         <div className="preview">
           <div className="card-head">
@@ -376,7 +379,7 @@ function CsvImport() {
             <tbody>
               {preview.rows.slice(0, 8).map((r, i) => {
                 const c = cats[categorise(r.description, r.amount, state.rules)];
-                return <tr key={i}><td className="nowrap">{r.date}</td><td>{r.description}</td><td>{c?.icon} {c?.name}</td><td className={`num ${r.amount > 0 ? 'pos' : ''}`}>{fmt(r.amount, { sign: true })}</td></tr>;
+                return <tr key={i}><td className="nowrap">{r.date}</td><td>{r.description}</td><td><Icon name={c?.icon} /> {c?.name}</td><td className={`num ${r.amount > 0 ? 'pos' : ''}`}>{fmt(r.amount, { sign: true })}</td></tr>;
               })}
             </tbody>
           </table>
@@ -403,7 +406,7 @@ function WatchFolder() {
   };
   return (
     <div className="sub-section">
-      <div className="card-head"><h4>📂 Auto-import from a folder</h4>{watchEnabled && watchFolder && <span className="badge done">● Watching</span>}</div>
+      <div className="card-head"><h4><Icon name="FolderOpen" />Auto-import from a folder</h4>{watchEnabled && watchFolder && <span className="badge done"><Dot />Watching</span>}</div>
       <p className="muted sm">Pick your <b>Downloads</b> folder and statements you download are imported automatically.</p>
       {!isDesktop ? <DesktopOnly /> : (
         <div className="inline-row">
@@ -458,13 +461,13 @@ function OpenBanking() {
 
   return (
     <div className="sub-section">
-      <div className="card-head"><h4>🏦 Enable Banking</h4>{bank.connected && <span className={`badge ${bank.needsReconnect ? 'upcoming' : 'done'}`}>● {bank.needsReconnect ? 'Needs reconnecting' : 'Connected'}</span>}</div>
+      <div className="card-head"><h4><Icon name="Landmark" />Enable Banking</h4>{bank.connected && <span className={`badge ${bank.needsReconnect ? 'upcoming' : 'done'}`}><Dot />{bank.needsReconnect ? 'Needs reconnecting' : 'Connected'}</span>}</div>
       <p className="muted">Free, read-only Open Banking for <b>EU/EEA banks only</b> (not UK). Re-approve every 90–180 days.</p>
       {!isDesktop ? <DesktopOnly /> : bank.connected ? (
         <>
           <ul className="list">
             {(state.accounts || []).filter((a) => (a.source || 'bank') === 'bank').map((a) => (
-              <li key={a.id} className="list-row"><span aria-hidden>🏦</span><span className="grow"><b>{a.name}</b><small className="muted"> · {bank.institutionName}</small></span><b>{typeof a.balance === 'number' ? fmt(a.balance) : '–'}</b></li>
+              <li key={a.id} className="list-row"><Icon name="Landmark" /><span className="grow"><b>{a.name}</b><small className="muted"> · {bank.institutionName}</small></span><b>{typeof a.balance === 'number' ? fmt(a.balance) : '–'}</b></li>
             ))}
           </ul>
           <div className="inline-row wrap">
@@ -484,7 +487,7 @@ function OpenBanking() {
           <div className="row2">
             <Field label="Application ID"><input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="e.g. 3f2c…" /></Field>
             <Field label="Private key file (.pem)">
-              <button type="button" className="btn ghost" onClick={async () => setPem(await api.bank.pickKey())}>{pem ? `✓ ${pem.name}` : 'Choose .pem file…'}</button>
+              <button type="button" className="btn ghost" onClick={async () => setPem(await api.bank.pickKey())}>{pem ? <><Icon name="Check" /> {pem.name}</> : 'Choose .pem file…'}</button>
             </Field>
           </div>
           <button className="btn primary" disabled={!appId || !pem || !!busy} onClick={saveCreds}>{busy === 'creds' ? 'Checking…' : 'Save & verify'}</button>

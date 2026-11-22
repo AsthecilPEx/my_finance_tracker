@@ -4,6 +4,7 @@ import ReceiptEditor from '../components/ReceiptEditor.jsx';
 import { GroupedBars } from '../components/Charts.jsx';
 import { basketAnalytics, receiptInbox, TIERS, SECTIONS } from '../../engine/receipts.js';
 import { shortDate } from '../../engine/dates.js';
+import { Icon } from '../components/Icon.jsx';
 
 export default function Receipts() {
   const { state, today, fmt, currency, dispatch, cats } = useApp();
@@ -35,18 +36,18 @@ export default function Receipts() {
 
       <div className="card">
         <div className="card-head">
-          <h3>📥 To itemise {inbox.length > 0 && <span className="count-badge">{inbox.length}</span>}</h3>
+          <h3><Icon name="Inbox" />To itemise {inbox.length > 0 && <span className="count-badge">{inbox.length}</span>}</h3>
           {inbox.length > 3 && <button className="btn ghost sm" onClick={() => dispatch({ type: 'receipt/skip', payload: { ids: inbox.map((t) => t.id) } })}>Skip all</button>}
         </div>
         {inbox.length === 0 ? <p className="empty">All caught up! New supermarket and shopping payments will appear here.</p> : (
           <ul className="list">
             {inbox.slice(0, 8).map((t) => (
               <li key={t.id} className="list-row">
-                <span aria-hidden>{cats[t.categoryId]?.icon}</span>
+                <Icon name={cats[t.categoryId]?.icon} />
                 <span className="grow"><b>{t.description}</b><small className="muted"> · {shortDate(t.date)} · {cats[t.categoryId]?.name}</small></span>
                 <b>{fmt(-t.amount)}</b>
-                <button className="btn primary sm" onClick={() => setOpen(t)}>🧾 Itemise</button>
-                <button className="icon-btn" aria-label="Skip" title="Don't ask for this one" onClick={() => dispatch({ type: 'receipt/skip', payload: { txnId: t.id } })}>✕</button>
+                <button className="btn primary sm" onClick={() => setOpen(t)}><Icon name="Receipt" /> Itemise</button>
+                <button className="icon-btn" aria-label="Skip" title="Don't ask for this one" onClick={() => dispatch({ type: 'receipt/skip', payload: { txnId: t.id } })}><Icon name="X" /></button>
               </li>
             ))}
           </ul>
@@ -88,10 +89,10 @@ export default function Receipts() {
               return (
                 <li key={r.id} className="list-row">
                   <span className="muted nowrap">{shortDate(r.date)}</span>
-                  <span className="grow"><b>{r.merchant}</b><small className="muted"> · {r.items.length} items{r.image ? ' · 📷' : ''}</small></span>
+                  <span className="grow"><b>{r.merchant}</b><small className="muted"> · {r.items.length} items{r.image ? ' · photo' : ''}</small></span>
                   <span className="mini-split" aria-label="Importance split">{split.filter((s) => s.v > 0).map((s) => <span key={s.k} style={{ flex: s.v, background: TIERS[s.k].color }} title={`${TIERS[s.k].label}: ${fmt(s.v)}`} />)}</span>
                   <b>{fmt(r.total)}</b>
-                  {t && <button className="icon-btn" aria-label="Edit receipt" onClick={() => setOpen(t)}>✎</button>}
+                  {t && <button className="icon-btn" aria-label="Edit receipt" onClick={() => setOpen(t)}><Icon name="Pencil" /></button>}
                 </li>
               );
             })}

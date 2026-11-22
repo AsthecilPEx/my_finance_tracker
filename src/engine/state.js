@@ -1,4 +1,5 @@
 import { DEFAULT_CATEGORIES, categorise, merchantKey } from './categories.js';
+import { iconName } from './icons.js';
 import { round2 } from './money.js';
 import { daysBetween } from './dates.js';
 import { normaliseItem } from './receipts.js';
@@ -72,6 +73,9 @@ export function migrate(state) {
   if (state.settings?.bank && state.settings.bank.provider !== 'enablebanking') merged.settings.bank = { ...base.settings.bank };
   const have = new Set((merged.categories || []).map((c) => c.id));
   merged.categories = [...(merged.categories || []), ...base.categories.filter((c) => !have.has(c.id))];
+  // Icons are lucide names now; saved emojis from older versions are translated.
+  merged.categories = merged.categories.map((c) => ({ ...c, icon: iconName(c.icon) }));
+  merged.goals = (merged.goals || []).map((g) => ({ ...g, icon: iconName(g.icon, 'Target') }));
   merged.version = STATE_VERSION;
   return merged;
 }

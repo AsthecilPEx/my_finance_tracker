@@ -5,6 +5,7 @@ import Modal from './Modal.jsx';
 import { Field } from './Forms.jsx';
 import { openSplits } from '../../engine/split.js';
 import { shortDate } from '../../engine/dates.js';
+import { Icon } from './Icon.jsx';
 
 /** "Split" a payment: say how much of it will be paid back to you. */
 export function SplitModal({ txn, onClose }) {
@@ -31,7 +32,7 @@ export function SplitModal({ txn, onClose }) {
   };
 
   return (
-    <Modal title="🤝 Split this payment" onClose={onClose}>
+    <Modal title="Split this payment" onClose={onClose}>
       <div className="split-head"><b>{txn.description}</b><span className="muted">{shortDate(txn.date)} · you paid {fmt(total)}</span></div>
       <div className="seg">
         <button type="button" className={mode === 'equal' ? 'on in' : ''} onClick={() => setMode('equal')}>Split equally</button>
@@ -58,8 +59,8 @@ export function SplitModal({ txn, onClose }) {
         </label>
         {!tracked && (
           <div className="callout">
-            💡 Add it to Splitwise so everyone sees what they owe.{' '}
-            <button type="button" className="linkish" onClick={() => api.openExternal('https://secure.splitwise.com/')}>Open Splitwise ↗</button>
+            <Icon name="Lightbulb" /> Add it to Splitwise so everyone sees what they owe.{' '}
+            <button type="button" className="linkish" onClick={() => api.openExternal('https://secure.splitwise.com/')}>Open Splitwise <Icon name="ExternalLink" /></button>
           </div>
         )}
         <div className="form-actions">
@@ -106,7 +107,7 @@ export function SettleModal({ incoming, onClose }) {
   };
 
   return (
-    <Modal title="🤝 Link a repayment" wide onClose={onClose}>
+    <Modal title="Link a repayment" wide onClose={onClose}>
       <div className="split-head"><b>{incoming.description}</b><span className="muted">{shortDate(incoming.date)} · received <b className="pos">{fmt(incoming.amount)}</b></span></div>
       {splits.length === 0 ? <p className="empty">You have no split payments waiting to be paid back. Mark a payment as "Split" first.</p> : (
         <>
@@ -131,7 +132,7 @@ export function SettleModal({ incoming, onClose }) {
           <div className="inline-row wrap">
             <button className="btn ghost sm" onClick={autoFill}>Fill oldest first</button>
             <span className="grow" />
-            <span className={left < -0.005 ? 'error' : 'muted'}>{left < -0.005 ? `${fmt(-left)} more than you received` : left > 0.005 ? `${fmt(left)} not linked (stays as a repayment)` : '✓ Fully linked'}</span>
+            <span className={left < -0.005 ? 'error' : 'muted'}>{left < -0.005 ? `${fmt(-left)} more than you received` : left > 0.005 ? `${fmt(left)} not linked (stays as a repayment)` : 'Fully linked'}</span>
           </div>
         </>
       )}

@@ -115,7 +115,7 @@ function promptForReceipts(beforeIds) {
   if (!fresh.length) return;
   const t = fresh[0];
   const more = fresh.length > 1 ? ` (+${fresh.length - 1} more)` : '';
-  notify(`🧾 ${t.description} · ${formatMoney(-t.amount, state.settings.currency)}${more}`, 'Add the receipt to see how much was essential. Snap a photo or type the items.', 'receipts');
+  notify(`${t.description} · ${formatMoney(-t.amount, state.settings.currency)}${more}`, 'Add the receipt to see how much was essential. Snap a photo or type the items.', 'receipts');
 }
 
 async function importWithPrompt(action) {

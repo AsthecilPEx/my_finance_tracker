@@ -1,6 +1,7 @@
 import { useApp } from '../store.jsx';
 import { parseISO } from '../../engine/dates.js';
 import { EVENT_TYPES, compactMoney } from './events.js';
+import { Icon } from './Icon.jsx';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -23,7 +24,7 @@ export default function MonthCalendar({ summary, selected, onSelect }) {
         const shown = day.events.slice(0, payday ? 1 : 2);
         const more = day.events.length - shown.length;
         const tip = [
-          ...day.events.map((e) => `${EVENT_TYPES[e.type].label}: ${e.name} ${e.estimated ? '≈ ' : ''}${fmt(e.amount)}${e.estimated ? ' (estimate: amount varies)' : ''}${e.override ? ` (edited${e.override.note ? `: ${e.override.note}` : ''})` : ''}${e.status === 'done' ? ' ✓' : e.status === 'assumed' ? ' (not seen on statement)' : ''}`),
+          ...day.events.map((e) => `${EVENT_TYPES[e.type].label}: ${e.name} ${e.estimated ? '≈ ' : ''}${fmt(e.amount)}${e.estimated ? ' (estimate: amount varies)' : ''}${e.override ? ` (edited${e.override.note ? `: ${e.override.note}` : ''})` : ''}${e.status === 'done' ? ' (paid)' : e.status === 'assumed' ? ' (not seen on statement)' : ''}`),
           'Click to see details or edit',
           day.flex ? `Day-to-day spending ${fmt(day.flex)}` : null,
         ].filter(Boolean).join('\n');
@@ -43,7 +44,7 @@ export default function MonthCalendar({ summary, selected, onSelect }) {
                 const t = EVENT_TYPES[e.type];
                 return (
                   <span key={e.key} className={`chip ${e.status} ${e.override ? 'edited' : ''}`} style={{ '--c': t.color }}>
-                    <i aria-hidden>{e.status === 'done' ? '✓' : t.icon}</i>{e.estimated && e.status !== 'done' ? '≈' : ''}{compactMoney(e.amount, currency)}{e.override ? '✎' : ''}
+                    <Icon name={e.status === 'done' ? 'Check' : t.icon} />{e.estimated && e.status !== 'done' ? '≈' : ''}{compactMoney(e.amount, currency)}{e.override ? <Icon name="Pencil" /> : null}
                   </span>
                 );
               })}
@@ -64,8 +65,8 @@ export function CalendarLegend() {
         <span key={k} className="legend-item"><span className="swatch" style={{ background: t.color }} />{t.label}</span>
       ))}
       <span className="legend-item"><span className="swatch bar" />Day-to-day spending</span>
-      <span className="legend-item"><span className="swatch done">✓</span>Paid</span>
-      <span className="legend-item"><span className="swatch done">✎</span>Edited (click a day to change a payday)</span>
+      <span className="legend-item"><span className="swatch done"><Icon name="Check" /></span>Paid</span>
+      <span className="legend-item"><span className="swatch done"><Icon name="Pencil" /></span>Edited (click a day to change a payday)</span>
     </div>
   );
 }

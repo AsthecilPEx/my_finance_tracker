@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { useApp } from '../store.jsx';
 import { generateInsights } from '../../engine/insights.js';
 import { GroupedBars, SparkBars, SplitBar } from '../components/Charts.jsx';
+import { Icon } from '../components/Icon.jsx';
 
 const KIND = {
-  critical: { label: 'Needs attention', icon: '⚠' },
-  warning: { label: 'Watch', icon: '◐' },
-  saving: { label: 'Saving opportunity', icon: '£' },
-  info: { label: 'Good to know', icon: 'i' },
-  good: { label: 'Doing well', icon: '✓' },
+  critical: { label: 'Needs attention', icon: 'TriangleAlert' },
+  warning: { label: 'Watch', icon: 'Contrast' },
+  saving: { label: 'Saving opportunity', icon: 'PiggyBank' },
+  info: { label: 'Good to know', icon: 'Info' },
+  good: { label: 'Doing well', icon: 'CircleCheck' },
 };
 
 export default function Insights() {
@@ -39,8 +40,8 @@ export default function Insights() {
         {ins.cards.map((c) => (
           <article key={c.id} className={`insight ${c.kind}`}>
             <div className="insight-top">
-              <span className="insight-icon" aria-hidden>{c.icon}</span>
-              <span className={`kind-pill ${c.kind}`}><i aria-hidden>{KIND[c.kind].icon}</i>{KIND[c.kind].label}</span>
+              <span className="insight-icon"><Icon name={c.icon} size="nav" /></span>
+              <span className={`kind-pill ${c.kind}`}><Icon name={KIND[c.kind].icon} />{KIND[c.kind].label}</span>
             </div>
             <h4>{c.title}</h4>
             <p>{c.detail}</p>
@@ -84,9 +85,9 @@ export default function Insights() {
         <div className="trend-grid">
           {ins.trends.map((c) => (
             <div key={c.id} className="trend">
-              <div className="trend-head"><span aria-hidden>{c.icon}</span><span className="grow">{c.name}</span>
+              <div className="trend-head"><Icon name={c.icon} /><span className="grow">{c.name}</span>
                 {c.change !== null && Math.abs(c.change) >= 0.05 && (
-                  <span className={`delta ${c.change > 0 ? 'up' : 'down'}`}>{c.change > 0 ? '▲' : '▼'} {Math.abs(Math.round(c.change * 100))}%</span>
+                  <span className={`delta ${c.change > 0 ? 'up' : 'down'}`}><Icon name={c.change > 0 ? 'TrendingUp' : 'TrendingDown'} /> {Math.abs(Math.round(c.change * 100))}%</span>
                 )}
               </div>
               <SparkBars values={c.series} color={c.color} labels={labels} format={(v) => fmt(v)} />

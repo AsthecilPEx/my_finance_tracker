@@ -6,18 +6,19 @@ import { payPlan } from '../../engine/planner.js';
 import { newId } from '../../engine/state.js';
 import { Field } from '../components/Forms.jsx';
 import IncomeEditor from '../components/IncomeEditor.jsx';
+import { Icon } from '../components/Icon.jsx';
 
 const BILL_PRESETS = [
-  { key: 'rent', name: 'Rent / mortgage', icon: '🏠', categoryId: 'housing', day: 1, compulsory: true, match: 'rent' },
-  { key: 'council', name: 'Council tax', icon: '🏛️', categoryId: 'utilities', day: 1, compulsory: true, match: 'council tax' },
-  { key: 'energy', name: 'Gas & electricity', icon: '⚡', categoryId: 'utilities', day: 5, compulsory: true, match: 'energy' },
-  { key: 'water', name: 'Water', icon: '💧', categoryId: 'utilities', day: 12, compulsory: true, match: 'water' },
-  { key: 'phone', name: 'Mobile phone', icon: '📱', categoryId: 'utilities', day: 18, compulsory: true, match: 'mobile' },
-  { key: 'broadband', name: 'Broadband', icon: '🌐', categoryId: 'utilities', day: 20, compulsory: true, match: 'broadband' },
-  { key: 'tv', name: 'TV licence', icon: '📺', categoryId: 'utilities', day: 1, compulsory: true, match: 'tv licen' },
-  { key: 'insurance', name: 'Insurance', icon: '🛡️', categoryId: 'insurance', day: 10, compulsory: true, match: 'insurance' },
-  { key: 'gym', name: 'Gym', icon: '💪', categoryId: 'health', day: 3, compulsory: false, match: 'gym', kind: 'subscription' },
-  { key: 'streaming', name: 'Streaming (Netflix, Spotify…)', icon: '🎬', categoryId: 'subscriptions', day: 8, compulsory: false, match: 'netflix', kind: 'subscription' },
+  { key: 'rent', name: 'Rent / mortgage', icon: 'House', categoryId: 'housing', day: 1, compulsory: true, match: 'rent' },
+  { key: 'council', name: 'Council tax', icon: 'Building2', categoryId: 'utilities', day: 1, compulsory: true, match: 'council tax' },
+  { key: 'energy', name: 'Gas & electricity', icon: 'Zap', categoryId: 'utilities', day: 5, compulsory: true, match: 'energy' },
+  { key: 'water', name: 'Water', icon: 'Droplet', categoryId: 'utilities', day: 12, compulsory: true, match: 'water' },
+  { key: 'phone', name: 'Mobile phone', icon: 'Smartphone', categoryId: 'utilities', day: 18, compulsory: true, match: 'mobile' },
+  { key: 'broadband', name: 'Broadband', icon: 'Globe', categoryId: 'utilities', day: 20, compulsory: true, match: 'broadband' },
+  { key: 'tv', name: 'TV licence', icon: 'Tv', categoryId: 'utilities', day: 1, compulsory: true, match: 'tv licen' },
+  { key: 'insurance', name: 'Insurance', icon: 'Shield', categoryId: 'insurance', day: 10, compulsory: true, match: 'insurance' },
+  { key: 'gym', name: 'Gym', icon: 'Dumbbell', categoryId: 'health', day: 3, compulsory: false, match: 'gym', kind: 'subscription' },
+  { key: 'streaming', name: 'Streaming (Netflix, Spotify…)', icon: 'Clapperboard', categoryId: 'subscriptions', day: 8, compulsory: false, match: 'netflix', kind: 'subscription' },
 ];
 
 const STEPS = ['You', 'Pay', 'Bills', 'Safety net', 'Ready'];
@@ -39,7 +40,7 @@ export default function Onboarding() {
       const p = BILL_PRESETS.find((x) => x.key === k);
       return { id: k, name: p.name, match: p.match, amount: +b.amount, direction: 'out', kind: p.kind || 'bill', categoryId: p.categoryId, frequency: 'monthly', dayOfMonth: +b.day || p.day, startDate: `${today.slice(0, 8)}01`, adjust: 'none', compulsory: p.compulsory, active: true };
     });
-    const goals = +goal.target > 0 ? [{ id: 'g', name: goal.name || 'Savings', icon: '🛟', target: +goal.target, saved: 0, perMonth: +goal.perMonth || 0, active: true }] : [];
+    const goals = +goal.target > 0 ? [{ id: 'g', name: goal.name || 'Savings', icon: 'LifeBuoy', target: +goal.target, saved: 0, perMonth: +goal.perMonth || 0, active: true }] : [];
     return { profile: { ...me, incomes }, recurring, debts: [], goals, transactions: [], settings: { billPot: { enabled: pot } } };
   }, [bills, incomes, me, pot, goal, today]);
   const prof = profileSummary(draftState);
@@ -68,7 +69,7 @@ export default function Onboarding() {
       <div className={`onboard-card ${step === 1 ? 'wide' : ''}`}>
         <div className="onboard-top">
           <div className="brand big"><span className="brand-dot" />Pulse Finance</div>
-          <ol className="stepper">{STEPS.map((s, i) => <li key={s} className={i === step ? 'on' : i < step ? 'done' : ''}>{i < step ? '✓' : i + 1}<span>{s}</span></li>)}</ol>
+          <ol className="stepper">{STEPS.map((s, i) => <li key={s} className={i === step ? 'on' : i < step ? 'done' : ''}>{i < step ? <Icon name="Check" /> : i + 1}<span>{s}</span></li>)}</ol>
         </div>
 
         {step === 0 && (
@@ -90,10 +91,10 @@ export default function Onboarding() {
                 </select>
               </Field>
             </div>
-            <p className="privacy-note">🔒 <b>Private by design.</b> No account, no cloud: your data stays on this computer.</p>
+            <p className="privacy-note"><Icon name="Lock" /> <b>Private by design.</b> No account, no cloud: your data stays on this computer.</p>
             <div className="onboard-actions">
               <button className="btn ghost" onClick={demo}>Just explore with demo data</button>
-              <button className="btn primary" onClick={() => setStep(1)}>Let's go →</button>
+              <button className="btn primary" onClick={() => setStep(1)}>Let's go <Icon name="ArrowRight" /></button>
             </div>
           </>
         )}
@@ -109,9 +110,9 @@ export default function Onboarding() {
             <IncomeEditor value={inc} region={me.region} onChange={(v) => setIncomes(incomes.map((x, i) => (i === tab ? v : x)))} />
             {incomes.length > 1 && <button className="btn ghost sm danger" onClick={() => { setIncomes(incomes.filter((_, i) => i !== tab)); setTab(0); }}>Remove this income</button>}
             <div className="onboard-actions">
-              <button className="btn ghost" onClick={() => setStep(0)}>← Back</button>
+              <button className="btn ghost" onClick={() => setStep(0)}><Icon name="ArrowLeft" /> Back</button>
               <span className="muted">≈ {fmt(prof.monthly, { decimals: 0 })} a month take-home</span>
-              <button className="btn primary" onClick={() => setStep(2)}>Next →</button>
+              <button className="btn primary" onClick={() => setStep(2)}>Next <Icon name="ArrowRight" /></button>
             </div>
           </>
         )}
@@ -126,7 +127,7 @@ export default function Onboarding() {
                 const upd = (patch) => setBills({ ...bills, [p.key]: { ...b, ...patch } });
                 return (
                   <div key={p.key} className={`preset ${b.on ? 'on' : ''}`}>
-                    <label className="check inline"><input type="checkbox" checked={b.on} onChange={(e) => upd({ on: e.target.checked })} /><span>{p.icon} {p.name}</span></label>
+                    <label className="check inline"><input type="checkbox" checked={b.on} onChange={(e) => upd({ on: e.target.checked })} /><span className="icon-label"><Icon name={p.icon} /> {p.name}</span></label>
                     {b.on && (
                       <>
                         <input type="number" min="0" step="0.01" placeholder="£ / month" value={b.amount} onChange={(e) => upd({ amount: e.target.value })} autoFocus />
@@ -139,9 +140,9 @@ export default function Onboarding() {
               })}
             </div>
             <div className="onboard-actions">
-              <button className="btn ghost" onClick={() => setStep(1)}>← Back</button>
+              <button className="btn ghost" onClick={() => setStep(1)}><Icon name="ArrowLeft" /> Back</button>
               <span className="muted">{fmt(billsMonthly, { decimals: 0 })} a month in bills</span>
-              <button className="btn primary" onClick={() => setStep(3)}>Next →</button>
+              <button className="btn primary" onClick={() => setStep(3)}>Next <Icon name="ArrowRight" /></button>
             </div>
           </>
         )}
@@ -152,12 +153,12 @@ export default function Onboarding() {
             <label className={`option-card ${pot ? 'on' : ''}`}>
               <input type="checkbox" checked={pot} onChange={(e) => setPot(e.target.checked)} />
               <div>
-                <b>🪣 Use a bills pot</b>
+                <b><Icon name="PiggyBank" /> Use a bills pot</b>
                 <p className="muted">Each payday, Pulse tells you how much to set aside for bills.</p>
               </div>
             </label>
             <div className="card inset">
-              <b>🎯 A first savings goal (optional)</b>
+              <b><Icon name="Target" /> A first savings goal (optional)</b>
               <div className="row3">
                 <Field label="Goal"><input value={goal.name} onChange={(e) => setGoal({ ...goal, name: e.target.value })} /></Field>
                 <Field label="Target"><input type="number" min="0" value={goal.target} onChange={(e) => setGoal({ ...goal, target: e.target.value })} placeholder="e.g. 1000" /></Field>
@@ -165,15 +166,15 @@ export default function Onboarding() {
               </div>
             </div>
             <div className="onboard-actions">
-              <button className="btn ghost" onClick={() => setStep(2)}>← Back</button>
-              <button className="btn primary" onClick={() => setStep(4)}>Next →</button>
+              <button className="btn ghost" onClick={() => setStep(2)}><Icon name="ArrowLeft" /> Back</button>
+              <button className="btn primary" onClick={() => setStep(4)}>Next <Icon name="ArrowRight" /></button>
             </div>
           </>
         )}
 
         {step === 4 && plan && (
           <>
-            <h1>You're all set{hi}! 🎉</h1>
+            <h1>You're all set{hi}!</h1>
             <div className="ready-grid">
               <div className="ready"><span>Take-home</span><b className="pos">{fmt(prof.monthly, { decimals: 0 })}</b><small>a month</small></div>
               <div className="ready"><span>Bills</span><b>{fmt(plan.commitmentsMonthly, { decimals: 0 })}</b><small>a month</small></div>
@@ -181,13 +182,13 @@ export default function Onboarding() {
               <div className="ready"><span>Steady spending</span><b>{fmt(plan.allowancePerDay, { decimals: 0 })}</b><small>a day</small></div>
             </div>
             <ul className="list compact">
-              {prof.sources.map((s) => <li key={s.inc.id} className="list-row"><span className="grow">💼 {s.inc.name} · <span className="muted">{describeSchedule(s.inc.schedule)}</span></span><b>{fmt(s.plannedPerPay)}</b></li>)}
+              {prof.sources.map((s) => <li key={s.inc.id} className="list-row"><span className="grow"><Icon name="Briefcase" /> {s.inc.name} · <span className="muted">{describeSchedule(s.inc.schedule)}</span></span><b>{fmt(s.plannedPerPay)}</b></li>)}
             </ul>
-            {pot && plan.billsShare > 0 && <p className="muted">🪣 Move <b>{Math.round(plan.billsShare * 100)}%</b> of each payday to your bills pot{plan.startingBuffer > 0 ? <>, starting with about <b>{fmt(plan.startingBuffer, { decimals: 0 })}</b></> : ''}.</p>}
-            {prof.monthly > 0 && plan.commitmentsMonthly + plan.goalsMonthly > prof.monthly && <p className="error">⚠ Your bills and goals are more than your take-home. The Pay Planner and Insights pages will help you find room.</p>}
+            {pot && plan.billsShare > 0 && <p className="muted"><Icon name="PiggyBank" /> Move <b>{Math.round(plan.billsShare * 100)}%</b> of each payday to your bills pot{plan.startingBuffer > 0 ? <>, starting with about <b>{fmt(plan.startingBuffer, { decimals: 0 })}</b></> : ''}.</p>}
+            {prof.monthly > 0 && plan.commitmentsMonthly + plan.goalsMonthly > prof.monthly && <p className="error"><Icon name="TriangleAlert" /> Your bills and goals are more than your take-home. The Pay Planner and Insights pages will help you find room.</p>}
             <div className="onboard-actions">
-              <button className="btn ghost" onClick={() => setStep(3)}>← Back</button>
-              <button className="btn primary" onClick={finish}>Open my dashboard →</button>
+              <button className="btn ghost" onClick={() => setStep(3)}><Icon name="ArrowLeft" /> Back</button>
+              <button className="btn primary" onClick={finish}>Open my dashboard <Icon name="ArrowRight" /></button>
             </div>
             <p className="muted xs">You can change any of this later in Settings → Profile & Pay.</p>
           </>

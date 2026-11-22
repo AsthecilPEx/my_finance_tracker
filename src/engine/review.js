@@ -58,7 +58,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     const key = `transfer:${o.id}:${match.id}`;
     if (dismissed.has(key)) continue;
     used.add(match.id); used.add(o.id);
-    items.push({ key, kind: 'transfer', icon: '🔁', txnIds: [o.id, match.id], amount: -o.amount, date: match.date,
+    items.push({ key, kind: 'transfer', icon: 'ArrowLeftRight', txnIds: [o.id, match.id], amount: -o.amount, date: match.date,
       title: `Transfer between your accounts?`, detail: `${o.account} → ${match.account} · ${match.date}` });
   }
 
@@ -69,7 +69,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     const key = `in:${t.id}`;
     if (dismissed.has(key)) continue;
     const looksTransfer = TRANSFER_WORDS.test(t.description) || (state.profile?.name && t.description.toLowerCase().includes(state.profile.name.toLowerCase()));
-    items.push({ key, kind: 'money-in', icon: '💷', txnIds: [t.id], amount: t.amount, date: t.date, suggestTransfer: looksTransfer, canSplit: splits.length > 0,
+    items.push({ key, kind: 'money-in', icon: 'Banknote', txnIds: [t.id], amount: t.amount, date: t.date, suggestTransfer: looksTransfer, canSplit: splits.length > 0,
       title: `What's this money in?`, detail: `${t.description} · ${t.date}${looksTransfer ? ' · looks like a transfer' : splits.length ? ' · could be a split repayment' : ''}` });
   }
 
@@ -78,14 +78,14 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     if (t.amount >= 0 || t.categoryId !== 'other' || -t.amount < 5 || used.has(t.id)) continue;
     const key = `cat:${t.id}`;
     if (dismissed.has(key)) continue;
-    items.push({ key, kind: 'categorise', icon: '🏷️', txnIds: [t.id], amount: -t.amount, date: t.date, title: 'Which category is this?', detail: `${t.description} · ${t.date}` });
+    items.push({ key, kind: 'categorise', icon: 'Tag', txnIds: [t.id], amount: -t.amount, date: t.date, title: 'Which category is this?', detail: `${t.description} · ${t.date}` });
   }
 
   // 4) Split bills overdue for repayment.
   for (const s of splits.filter((x) => x.overdue)) {
     const key = `split:${s.txn.id}:${s.txn.split.expectedBy}`;
     if (dismissed.has(key)) continue;
-    items.push({ key, kind: 'split-overdue', icon: '🤝', txnIds: [s.txn.id], amount: round2(s.outstanding), date: s.txn.date,
+    items.push({ key, kind: 'split-overdue', icon: 'Handshake', txnIds: [s.txn.id], amount: round2(s.outstanding), date: s.txn.date,
       title: `${s.txn.split.who || 'Someone'} still owes you`, detail: `${s.txn.description} · ${s.txn.date} · was due ${s.txn.split.expectedBy}` });
   }
 
@@ -94,7 +94,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
     const key = `amount:${o.key}`;
     if (dismissed.has(key)) continue;
     const card = o.source === 'debt';
-    items.push({ key, kind: 'bill-amount', icon: card ? '💳' : '🧾', occKey: o.key, amount: -o.amount, date: o.date, estimate: -o.amount,
+    items.push({ key, kind: 'bill-amount', icon: card ? 'CreditCard' : 'Receipt', occKey: o.key, amount: -o.amount, date: o.date, estimate: -o.amount,
       title: card ? `${o.name} statement: how much is due?` : `${o.name}: what's this bill?`,
       detail: `Due ${o.date} · planning ≈ ${formatMoney(-o.amount, state.settings?.currency || 'GBP')}` });
   }
@@ -103,7 +103,7 @@ export function reviewQueue(state, today, { days = 45, limit = 12 } = {}) {
   for (const { card, txn } of purchasesAwaitingPlan(state, today)) {
     const key = `plan:${txn.id}`;
     if (dismissed.has(key)) continue;
-    items.push({ key, kind: 'card-plan', icon: '💳', txnIds: [txn.id], cardId: card.id, amount: -txn.amount, date: txn.date,
+    items.push({ key, kind: 'card-plan', icon: 'CreditCard', txnIds: [txn.id], cardId: card.id, amount: -txn.amount, date: txn.date,
       title: `How are you paying for ${txn.description}?`, detail: `${card.name} · ${txn.date}` });
   }
 

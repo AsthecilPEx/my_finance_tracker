@@ -120,7 +120,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     if (list.length < 6) continue;
     const total = -sum(list, (t) => t.amount);
     cards.push({
-      id: `habit-${k}`, kind: 'saving', icon: cats[list[0].categoryId]?.icon || '☕',
+      id: `habit-${k}`, kind: 'saving', icon: cats[list[0].categoryId]?.icon || 'Coffee',
       title: `${list.length} purchases at ${prettyName(list[0].description)} in 30 days`,
       detail: `That's ${fmt(total)} a month, or about ${fmt(total * 12, { decimals: 0 })} a year. Cutting it in half saves ${fmt(total / 2)} a month.`,
       saving: round2(total / 2),
@@ -132,7 +132,7 @@ export function generateInsights(state, today, currency = 'GBP') {
   const subsMonthly = sum(subs, (r) => monthlyEquivalent(r.amount, r.frequency));
   if (subs.length >= 3) {
     cards.push({
-      id: 'subs-total', kind: 'info', icon: '📺',
+      id: 'subs-total', kind: 'info', icon: 'Tv',
       title: `${subs.length} subscriptions cost ${fmt(subsMonthly)} a month`,
       detail: `That's ${fmt(subsMonthly * 12, { decimals: 0 })} a year. Cancel any you haven't used in the last month. Most can be restarted at any time.`,
     });
@@ -142,7 +142,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     const cheapest = [...streams].sort((a, b) => a.amount - b.amount).slice(0, streams.length - 1);
     const saving = sum(cheapest, (r) => monthlyEquivalent(r.amount, r.frequency));
     cards.push({
-      id: 'subs-streaming', kind: 'saving', icon: '🎬',
+      id: 'subs-streaming', kind: 'saving', icon: 'Clapperboard',
       title: `You pay for ${streams.length} streaming services`,
       detail: `${streams.map((s) => s.name).join(', ')}. Rotating them (one at a time, switching monthly) saves about ${fmt(saving)} a month.`,
       saving: round2(saving),
@@ -156,7 +156,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     if (daysBetween(s.lastDate, today) > 45) continue;
     const diff = s.amountChanged.to - s.amountChanged.from;
     cards.push({
-      id: `rise-${s.match}`, kind: 'warning', icon: '📈',
+      id: `rise-${s.match}`, kind: 'warning', icon: 'TrendingUp',
       title: `${s.name} went up by ${fmt(diff)}`,
       detail: `Now ${fmt(s.amountChanged.to)} (was ${fmt(s.amountChanged.from)}), up ${Math.round((diff / s.amountChanged.from) * 100)}%. Worth calling to haggle or switching provider.`,
       saving: round2(diff),
@@ -168,7 +168,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     if (Math.abs(d.change) < 0.5 && Math.abs(d.pct) < 0.01) continue;
     const up = d.change > 0;
     cards.push({
-      id: `fx-${d.name}`, kind: up ? 'warning' : 'good', icon: '💱',
+      id: `fx-${d.name}`, kind: up ? 'warning' : 'good', icon: 'Coins',
       title: `${d.name} costs ${fmt(Math.abs(d.change))} ${up ? 'more' : 'less'} than a month ago`,
       detail: `${formatMoney(d.amount, d.currency)} is ${fmt(d.costNow)} at today's rate vs ${fmt(d.costThen)} 30 days ago (${up ? '+' : ''}${(d.pct * 100).toFixed(1)}%).${up ? ' If you can, send it on a better-rate day or lock in a rate with your transfer provider.' : ''}`,
       saving: up ? d.change : 0,
@@ -184,7 +184,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     const interestNow = (worst.balance * worst.apr) / 100 / 12;
     const monthsSooner = base.stuck ? null : base.months - plus.months;
     cards.push({
-      id: 'debt-apr', kind: 'saving', icon: '💳',
+      id: 'debt-apr', kind: 'saving', icon: 'CreditCard',
       title: `${worst.name} costs about ${fmt(interestNow)} a month in interest`,
       detail: base.stuck
         ? `At ${worst.apr}% APR your minimum payments barely cover the interest. Overpaying this one first (the avalanche method) matters most.`
@@ -200,9 +200,9 @@ export function generateInsights(state, today, currency = 'GBP') {
     const out = sum(full, (m) => m.spent);
     const rate = (inc - out) / inc;
     if (rate < 0.1) {
-      cards.push({ id: 'save-rate', kind: rate < 0 ? 'critical' : 'warning', icon: '🐷', title: rate < 0 ? 'You spent more than you earned' : `You kept ${Math.round(rate * 100)}% of your income`, detail: `Across the last ${full.length} months you earned ${fmt(inc / full.length, { decimals: 0 })} and spent ${fmt(out / full.length, { decimals: 0 })} a month on average. Aim to save at least 10–20%.` });
+      cards.push({ id: 'save-rate', kind: rate < 0 ? 'critical' : 'warning', icon: 'PiggyBank', title: rate < 0 ? 'You spent more than you earned' : `You kept ${Math.round(rate * 100)}% of your income`, detail: `Across the last ${full.length} months you earned ${fmt(inc / full.length, { decimals: 0 })} and spent ${fmt(out / full.length, { decimals: 0 })} a month on average. Aim to save at least 10–20%.` });
     } else if (rate >= 0.2) {
-      cards.push({ id: 'save-rate', kind: 'good', icon: '🐷', title: `You're keeping ${Math.round(rate * 100)}% of your income`, detail: `That's a great savings rate. Consider moving the surplus to an easy-access saver or ISA straight after payday.` });
+      cards.push({ id: 'save-rate', kind: 'good', icon: 'PiggyBank', title: `You're keeping ${Math.round(rate * 100)}% of your income`, detail: `That's a great savings rate. Consider moving the surplus to an easy-access saver or ISA straight after payday.` });
     }
   }
 
@@ -216,7 +216,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     const otherDays = Math.max(1, 120 - window.size);
     const outWin = sum(recent.filter((t) => !window.has(t.date)), (t) => -t.amount) / otherDays;
     if (outWin > 0 && inWin / outWin > 1.6) {
-      cards.push({ id: 'payday-spike', kind: 'info', icon: '🎉', title: `You spend ${(inWin / outWin).toFixed(1)}× more in the 3 days after payday`, detail: 'Try scheduling a savings transfer for payday morning so the money is moved before it gets spent.' });
+      cards.push({ id: 'payday-spike', kind: 'info', icon: 'CalendarDays', title: `You spend ${(inWin / outWin).toFixed(1)}× more in the 3 days after payday`, detail: 'Try scheduling a savings transfer for payday morning so the money is moved before it gets spent.' });
     }
   }
 
@@ -224,7 +224,7 @@ export function generateInsights(state, today, currency = 'GBP') {
   for (const t of txns.filter((x) => x.date.startsWith(curKey) && x.amount < -100 && cats[x.categoryId]?.type === 'lifestyle')) {
     const hist = txns.filter((x) => x.categoryId === t.categoryId && x.amount < 0 && !x.date.startsWith(curKey)).map((x) => -x.amount);
     if (hist.length >= 5 && -t.amount > 3 * median(hist)) {
-      cards.push({ id: `big-${t.id}`, kind: 'info', icon: '🔎', title: `Large ${cats[t.categoryId]?.name.toLowerCase()} purchase: ${fmt(-t.amount)}`, detail: `${t.description} on ${t.date}. That's more than 3× your typical ${cats[t.categoryId]?.name.toLowerCase()} purchase.` });
+      cards.push({ id: `big-${t.id}`, kind: 'info', icon: 'Search', title: `Large ${cats[t.categoryId]?.name.toLowerCase()} purchase: ${fmt(-t.amount)}`, detail: `${t.description} on ${t.date}. That's more than 3× your typical ${cats[t.categoryId]?.name.toLowerCase()} purchase.` });
     }
   }
 
@@ -235,7 +235,7 @@ export function generateInsights(state, today, currency = 'GBP') {
     if (!lastTxn) continue;
     const usual = recent.slice(1).reduce((a, b) => a + b, 0) / (recent.length - 1);
     if (usual > 0 && recent[0] > usual * 1.3 && recent[0] - usual >= 10) {
-      cards.push({ id: `bill-spike-${r.id}-${lastTxn.date}`, kind: 'warning', icon: '📈', title: `${r.name} was ${Math.round((recent[0] / usual - 1) * 100)}% higher than usual`, detail: `${fmt(recent[0])} on ${lastTxn.date}, against a usual ${fmt(usual)}. Worth checking a meter reading or your tariff.` });
+      cards.push({ id: `bill-spike-${r.id}-${lastTxn.date}`, kind: 'warning', icon: 'TrendingUp', title: `${r.name} was ${Math.round((recent[0] / usual - 1) * 100)}% higher than usual`, detail: `${fmt(recent[0])} on ${lastTxn.date}, against a usual ${fmt(usual)}. Worth checking a meter reading or your tariff.` });
     }
   }
 
@@ -253,7 +253,7 @@ export function generateInsights(state, today, currency = 'GBP') {
   const avgIncome = full.length ? sum(full, (m) => m.income) / full.length : 0;
   if (avgIncome > 0 && split.discretionary / avgIncome > 0.3) {
     const over = split.discretionary - avgIncome * 0.3;
-    cards.push({ id: 'rule-503020', kind: 'saving', icon: '⚖️', title: 'Discretionary spending is above the 30% guideline', detail: `The 50/30/20 rule suggests keeping "wants" to 30% of take-home pay (${fmt(avgIncome * 0.3, { decimals: 0 })}). You're averaging ${fmt(split.discretionary, { decimals: 0 })}.`, saving: round2(over) });
+    cards.push({ id: 'rule-503020', kind: 'saving', icon: 'Scale', title: 'Discretionary spending is above the 30% guideline', detail: `The 50/30/20 rule suggests keeping "wants" to 30% of take-home pay (${fmt(avgIncome * 0.3, { decimals: 0 })}). You're averaging ${fmt(split.discretionary, { decimals: 0 })}.`, saving: round2(over) });
   }
 
   // --- Top merchants (last 90 days) ---

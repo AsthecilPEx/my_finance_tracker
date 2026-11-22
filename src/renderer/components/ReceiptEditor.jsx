@@ -6,13 +6,14 @@ import { TIERS, SECTIONS, parseReceiptText, suggestTier, receiptSectionFor, norm
 import { newId } from '../../engine/state.js';
 import { shortDate } from '../../engine/dates.js';
 import { myAmount } from '../../engine/split.js';
+import { Icon, Spinner } from './Icon.jsx';
 
 export function TierPicker({ value, onChange }) {
   return (
     <div className="tier-picker" role="radiogroup" aria-label="Importance">
       {Object.entries(TIERS).map(([k, t]) => (
         <button key={k} type="button" role="radio" aria-checked={value === k} title={t.label} className={value === k ? 'on' : ''} style={{ '--c': t.color }} onClick={() => onChange(k)}>
-          <i aria-hidden>{t.icon}</i>{k === 'essential' ? 'Essential' : k === 'moderate' ? 'Moderate' : 'Not so'}
+          <Icon name={t.icon} />{k === 'essential' ? 'Essential' : k === 'moderate' ? 'Moderate' : 'Not so'}
         </button>
       ))}
     </div>
@@ -76,7 +77,7 @@ export default function ReceiptEditor({ txn, onClose }) {
   };
 
   return (
-    <Modal title={`🧾 ${txn.description}`} wide onClose={onClose}>
+    <Modal title={txn.description} wide onClose={onClose}>
       <div className="receipt-top">
         <div>
           <div className="muted sm">{shortDate(txn.date)} · {SECTIONS[section]?.label}{txn.split?.owed > 0 ? ` · your share of ${fmt(-txn.amount)}` : ''}</div>
@@ -84,11 +85,11 @@ export default function ReceiptEditor({ txn, onClose }) {
         </div>
         <div className="receipt-photo">
           {preview ? <img src={preview} alt="Receipt" /> : <div className="photo-placeholder">No photo</div>}
-          <button className="btn ghost sm" onClick={photo} disabled={!!busy}>📷 {image ? 'Replace photo' : 'Add receipt photo'}</button>
+          <button className="btn ghost sm" onClick={photo} disabled={!!busy}><Icon name="Camera" /> {image ? 'Replace photo' : 'Add receipt photo'}</button>
           {!isDesktop && <small className="muted">Photo reading works in the desktop app</small>}
         </div>
       </div>
-      {busy && <div className="scanning"><span className="spinner" />{busy}</div>}
+      {busy && <div className="scanning"><Spinner />{busy}</div>}
 
       <div className="quick-add">
         <textarea rows={3} value={quick} onChange={(e) => setQuick(e.target.value)} placeholder={'Type or paste items, one per line:\nmilk 1.45\n2 x chicken @ 2.85'} />
@@ -106,10 +107,10 @@ export default function ReceiptEditor({ txn, onClose }) {
               <td><TierPicker value={it.tier} onChange={(tier) => upd(it.id, { tier })} /></td>
               <td>
                 <select value={it.section} onChange={(e) => upd(it.id, { section: e.target.value })}>
-                  {Object.entries(SECTIONS).map(([k, s]) => <option key={k} value={k}>{s.icon} {s.label}</option>)}
+                  {Object.entries(SECTIONS).map(([k, s]) => <option key={k} value={k}>{s.label}</option>)}
                 </select>
               </td>
-              <td><button className="icon-btn danger" aria-label="Remove item" onClick={() => setItems((cur) => cur.filter((x) => x.id !== it.id))}>✕</button></td>
+              <td><button className="icon-btn danger" aria-label="Remove item" onClick={() => setItems((cur) => cur.filter((x) => x.id !== it.id))}><Icon name="X" /></button></td>
             </tr>
           ))}
           {!items.length && <tr><td colSpan={6} className="muted">No items yet. Add a photo, type lines above, or add a row.</td></tr>}
@@ -118,7 +119,7 @@ export default function ReceiptEditor({ txn, onClose }) {
       <div className="inline-row wrap">
         <button className="btn ghost sm" onClick={() => setItems((cur) => [...cur, ...withRules([{ name: '', price: '' }])])}>+ Add row</button>
         <span className="grow" />
-        <span className={Math.abs(gap) < 0.01 ? 'pos' : 'muted'}>Items {fmt(itemsTotal)} of {fmt(total)}{Math.abs(gap) >= 0.01 ? ` · ${fmt(Math.abs(gap))} ${gap > 0 ? 'not itemised' : 'over'}` : ' ✓ matches'}</span>
+        <span className={Math.abs(gap) < 0.01 ? 'pos' : 'muted'}>Items {fmt(itemsTotal)} of {fmt(total)}{Math.abs(gap) >= 0.01 ? ` · ${fmt(Math.abs(gap))} ${gap > 0 ? 'not itemised' : 'over'}` : ' · matches'}</span>
         {gap >= 0.01 && <button className="btn ghost sm" onClick={() => setItems((cur) => [...cur, { id: newId(), name: 'Other items', qty: 1, price: gap, tier: 'moderate', section }])}>Add remainder</button>}
       </div>
       <div className="form-actions">

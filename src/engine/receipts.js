@@ -5,15 +5,15 @@ import { round2, sum } from './money.js';
 import { merchantKey } from './categories.js';
 
 export const TIERS = {
-  essential: { label: 'Essential', short: 'Essential', color: '#3a86ee', icon: '●' },
-  moderate: { label: 'Moderately important', short: 'Moderate', color: '#c08800', icon: '◐' },
-  low: { label: 'Not so important', short: 'Not so important', color: '#e8558f', icon: '○' },
+  essential: { label: 'Essential', short: 'Essential', color: '#3a86ee', icon: 'CircleDot' },
+  moderate: { label: 'Moderately important', short: 'Moderate', color: '#c08800', icon: 'Contrast' },
+  low: { label: 'Not so important', short: 'Not so important', color: '#e8558f', icon: 'Circle' },
 };
 
 export const SECTIONS = {
-  groceries: { label: 'Groceries', icon: '🛒' },
-  general: { label: 'General / household', icon: '🧺' },
-  food: { label: 'Food out & takeaway', icon: '🍔' },
+  groceries: { label: 'Groceries', icon: 'ShoppingCart' },
+  general: { label: 'General / household', icon: 'ShoppingBasket' },
+  food: { label: 'Food out & takeaway', icon: 'Utensils' },
 };
 
 // Categories the app actively asks you to itemise (supermarkets, shops, bigger food bills).

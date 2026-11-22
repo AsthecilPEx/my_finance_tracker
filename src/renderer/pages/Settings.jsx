@@ -13,6 +13,7 @@ import { useUpdateStatus } from '../components/UpdateBanner.jsx';
 import { APP_VERSION } from '../../config.js';
 import { useDialog } from '../components/Dialogs.jsx';
 import { AccountsList } from '../components/Cards.jsx';
+import { Icon } from '../components/Icon.jsx';
 
 export default function Settings() {
   const { state, dispatch, notify, today, fmt } = useApp();
@@ -42,7 +43,7 @@ export default function Settings() {
       <header className="page-head"><div><h1>Settings</h1><p className="muted">Change anything here and the calendar, planner and insights update straight away.</p></div></header>
 
       <div className="card" id="profile">
-        <div className="card-head"><h3>👤 Profile & Pay</h3><span className="muted sm">≈ {fmt(prof.monthly, { decimals: 0 })} a month take-home</span></div>
+        <div className="card-head"><h3><Icon name="User" />Profile & Pay</h3><span className="muted sm">≈ {fmt(prof.monthly, { decimals: 0 })} a month take-home</span></div>
         <div className="row3">
           <Field label="Your name"><input defaultValue={profile.name} onBlur={(e) => dispatch({ type: 'profile/update', payload: { name: e.target.value.trim() } })} /></Field>
           <Field label="Tax region">
@@ -60,11 +61,11 @@ export default function Settings() {
         <ul className="list">
           {prof.sources.map((s) => (
             <li key={s.inc.id} className="list-row">
-              <span aria-hidden>💼</span>
+              <Icon name="Briefcase" />
               <span className="grow"><b>{s.inc.name}</b><small className="muted"> · {describeSchedule(s.inc.schedule)}{s.th.band ? ` · ${s.th.band}` : ''}{s.inc.variable ? ' · variable' : ''}</small></span>
               <span className="muted">{fmt(s.plannedPerPay)} per pay</span>
               <b>{fmt(s.monthly, { decimals: 0 })}/mo</b>
-              <button className="icon-btn" aria-label={`Edit ${s.inc.name}`} onClick={() => setEditing(s.inc)}>✎</button>
+              <button className="icon-btn" aria-label={`Edit ${s.inc.name}`} onClick={() => setEditing(s.inc)}><Icon name="Pencil" /></button>
             </li>
           ))}
           {!prof.sources.length && <li className="muted">No income added yet. Add one so paydays appear on your calendar.</li>}
@@ -75,7 +76,7 @@ export default function Settings() {
       <Currencies />
 
       <div className="card">
-        <h3>🪣 Bills pot & safety net</h3>
+        <h3><Icon name="PiggyBank" />Bills pot & safety net</h3>
         <Toggle label="Tell me how much to set aside for bills each payday" checked={st.billPot?.enabled} onChange={(v) => set({ billPot: { ...st.billPot, enabled: v } })} />
         <Field label="Money already in your bills pot / buffer" hint="Used by the Pay Planner to tell you whether your buffer is big enough">
           <input type="number" min="0" step="1" defaultValue={st.billPot?.balance || ''} onBlur={(e) => set({ billPot: { ...st.billPot, balance: +e.target.value || 0 } })} />
@@ -85,7 +86,7 @@ export default function Settings() {
 
       {isDesktop && (
         <div className="card">
-          <h3>🖥️ Desktop</h3>
+          <h3><Icon name="Monitor" />Desktop</h3>
           <Toggle label="Start Pulse when Windows starts" checked={st.launchAtLogin} onChange={(v) => set({ launchAtLogin: v })} />
           <Toggle label="Closing the window keeps Pulse running in the tray (for syncing and reminders)" checked={st.minimizeToTray} onChange={(v) => set({ minimizeToTray: v })} />
           <Toggle label="Reminders: bills due tomorrow, payday, spend caps, receipts" checked={st.notifications} onChange={(v) => set({ notifications: v })} />
@@ -98,13 +99,13 @@ export default function Settings() {
       )}
 
       <div className="card" id="accounts">
-        <h3>🏦 Your accounts</h3>
+        <h3><Icon name="Landmark" />Your accounts</h3>
         <p className="muted">Mark credit cards so Pulse works out their bills.</p>
         <AccountsList />
       </div>
 
       <div className="card">
-        <h3>💾 Your data</h3>
+        <h3><Icon name="HardDrive" />Your data</h3>
         <p className="muted">Everything is stored locally on this computer{isDesktop ? ' with automatic daily backups' : ''}. Nothing is uploaded anywhere.</p>
         <div className="inline-row wrap">
           <button className="btn ghost" onClick={() => api.exportBackup(state)}>Export backup</button>
@@ -174,7 +175,7 @@ function Currencies() {
   return (
     <div className="card">
       <div className="card-head">
-        <h3>💱 Currencies & exchange rates</h3>
+        <h3><Icon name="Coins" />Currencies & exchange rates</h3>
         {isDesktop && <button className="btn ghost sm" disabled={busy} onClick={refresh}>{busy ? 'Updating…' : 'Update now'}</button>}
       </div>
       <p className="muted sm">
@@ -197,7 +198,7 @@ function Currencies() {
                   <td className={`num ${ch > 0 ? 'pos' : ch < 0 ? 'neg' : ''}`} title="Positive means your pound buys more">{ch !== null && then !== now ? `${ch > 0 ? '+' : ''}${(ch * 100).toFixed(2)}%` : '–'}</td>
                   <td className="num">
                     <button className="linkish muted sm" onClick={() => setManual(c)}>set manually</button>
-                    {!inUse.includes(c) && <button className="icon-btn" aria-label={`Stop watching ${c}`} onClick={() => dispatch({ type: 'settings/update', payload: { watchCurrencies: watched.filter((x) => x !== c) } })}>✕</button>}
+                    {!inUse.includes(c) && <button className="icon-btn" aria-label={`Stop watching ${c}`} onClick={() => dispatch({ type: 'settings/update', payload: { watchCurrencies: watched.filter((x) => x !== c) } })}><Icon name="X" /></button>}
                   </td>
                 </tr>
               );
@@ -230,7 +231,7 @@ function About() {
   return (
     <div className="card">
       <div className="card-head">
-        <h3>✨ About & updates</h3>
+        <h3><Icon name="Sparkles" />About & updates</h3>
         <span className="muted sm">Version {APP_VERSION}</span>
       </div>
       <p className={status?.state === 'error' ? 'note' : 'muted'}>{text}</p>

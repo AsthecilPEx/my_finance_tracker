@@ -164,8 +164,8 @@ export function createDemoState(today) {
     { id: newId(), name: 'Eating out this pay period', scope: 'category', categoryId: 'eating_out', amount: 300, period: 'payperiod', alertAt: 0.8, active: true },
   ];
   out.goals = [
-    { id: newId(), name: 'Emergency fund', icon: '🛟', target: 2000, saved: 650, perMonth: 150, targetDate: addMonths(today, 9), active: true },
-    { id: newId(), name: 'Summer holiday', icon: '🏖️', target: 1200, saved: 300, perMonth: 100, targetDate: addMonths(today, 9), active: true },
+    { id: newId(), name: 'Emergency fund', icon: 'LifeBuoy', target: 2000, saved: 650, perMonth: 150, targetDate: addMonths(today, 9), active: true },
+    { id: newId(), name: 'Summer holiday', icon: 'Umbrella', target: 1200, saved: 300, perMonth: 100, targetDate: addMonths(today, 9), active: true },
   ];
   return out;
 }

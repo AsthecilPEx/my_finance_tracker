@@ -13,6 +13,7 @@ import { splitTotals } from '../../engine/split.js';
 import PayEditor from '../components/PayEditor.jsx';
 import { parseOccKey } from '../../engine/income.js';
 import { scheduleItems } from '../../engine/summary.js';
+import { Icon } from '../components/Icon.jsx';
 
 function greeting() {
   const h = new Date().getHours();
@@ -30,7 +31,7 @@ export default function Dashboard({ go }) {
 
   const used = s.spent + s.saved + s.committedPending;
   const leftRatio = s.income > 0 ? s.leftToSpend / s.income : 0;
-  const status = !s.income ? { c: 'var(--accent)', t: 'Add your pay under Bills & Income', i: 'i' } : s.leftToSpend < 0 ? { c: 'var(--critical)', t: 'Overspent', i: '⚠' } : leftRatio < 0.1 ? { c: 'var(--warning)', t: 'Running low', i: '◐' } : { c: 'var(--good)', t: 'On track', i: '✓' };
+  const status = !s.income ? { c: 'var(--accent)', t: 'Add your pay under Bills & Income', i: 'Info' } : s.leftToSpend < 0 ? { c: 'var(--critical)', t: 'Overspent', i: 'TriangleAlert' } : leftRatio < 0.1 ? { c: 'var(--warning)', t: 'Running low', i: 'Contrast' } : { c: 'var(--good)', t: 'On track', i: 'CircleCheck' };
   const selDay = s.days[selected];
   const owed = useMemo(() => splitTotals(state, today), [state, today]);
   const [editOcc, setEditOcc] = useState(null);
@@ -66,15 +67,15 @@ export default function Dashboard({ go }) {
       {(caps.length > 0 || inbox.length > 0 || (np && np.inDays <= 1 && plan.billsShare > 0 && state.settings.billPot?.enabled !== false)) && (
         <div className="alerts">
           {np && np.inDays <= 1 && plan.billsShare > 0 && state.settings.billPot?.enabled !== false && (
-            <button className="alert good" onClick={() => go('planner')}><i aria-hidden>🪣</i><span><b>Payday routine:</b> move {fmt(np.amount * plan.billsShare, { decimals: 0 })} of {np.name} to your bills pot{plan.goalsShare > 0 ? ` and ${fmt(np.amount * plan.goalsShare, { decimals: 0 })} to goals` : ''}</span></button>
+            <button className="alert good" onClick={() => go('planner')}><Icon name="PiggyBank" /><span><b>Payday routine:</b> move {fmt(np.amount * plan.billsShare, { decimals: 0 })} of {np.name} to your bills pot{plan.goalsShare > 0 ? ` and ${fmt(np.amount * plan.goalsShare, { decimals: 0 })} to goals` : ''}</span></button>
           )}
           {caps.map((c) => (
             <button key={c.cap.id} className={`alert ${c.status}`} onClick={() => go('budgets')}>
-              <i aria-hidden>{c.status === 'over' ? '⚠' : '◐'}</i><span><b>{c.label}:</b> {fmt(c.spent, { decimals: 0 })} of {fmt(c.cap.amount, { decimals: 0 })} {c.window.label}{c.status === 'over' ? ` (${fmt(-c.remaining, { decimals: 0 })} over)` : ` (${fmt(c.remaining, { decimals: 0 })} left)`}</span>
+              <Icon name={c.status === 'over' ? 'TriangleAlert' : 'Contrast'} /><span><b>{c.label}:</b> {fmt(c.spent, { decimals: 0 })} of {fmt(c.cap.amount, { decimals: 0 })} {c.window.label}{c.status === 'over' ? ` (${fmt(-c.remaining, { decimals: 0 })} over)` : ` (${fmt(c.remaining, { decimals: 0 })} left)`}</span>
             </button>
           ))}
           {inbox.length > 0 && (
-            <button className="alert info" onClick={() => go('receipts')}><i aria-hidden>🧾</i><span><b>{inbox.length} shop{inbox.length === 1 ? '' : 's'} to itemise</b>, latest {inbox[0].description} {fmt(-inbox[0].amount)}. Add the receipt to see what's essential.</span></button>
+            <button className="alert info" onClick={() => go('receipts')}><Icon name="Receipt" /><span><b>{inbox.length} shop{inbox.length === 1 ? '' : 's'} to itemise</b>, latest {inbox[0].description} {fmt(-inbox[0].amount)}. Add the receipt to see what's essential.</span></button>
           )}
         </div>
       )}
@@ -94,30 +95,30 @@ export default function Dashboard({ go }) {
               {s.saved > 0 && <div className="eq-row"><span>− Saved</span><b>{fmt(s.saved, { decimals: 0 })}</b></div>}
               <div className="eq-row"><span>− Bills still to pay</span><b>{fmt(s.committedPending, { decimals: 0 })}</b></div>
               <div className="eq-row total"><span>= Left</span><b style={{ color: status.c }}>{fmt(s.leftToSpend, { decimals: 0 })}</b></div>
-              <div className="status-pill" style={{ '--c': status.c }}><i aria-hidden>{status.i}</i>{status.t}</div>
+              <div className="status-pill" style={{ '--c': status.c }}><Icon name={status.i} />{status.t}</div>
             </div>
             <div className="hero-stats">
               {s.nextPayday && (
                 <div className="stat">
-                  <span className="stat-label">💼 Next payday</span>
+                  <span className="stat-label"><Icon name="Briefcase" /> Next payday</span>
                   <span className="stat-value">{s.nextPayday.inDays === 0 ? 'Today!' : `${s.nextPayday.inDays} day${s.nextPayday.inDays === 1 ? '' : 's'}`}</span>
                   <span className="stat-sub">{weekdayShort(s.nextPayday.date)} {shortDate(s.nextPayday.date)} · {fmt(s.nextPayday.amount, { decimals: 0 })}</span>
                 </div>
               )}
               {s.safePerDay !== null && (
                 <div className="stat">
-                  <span className="stat-label">🛡️ Safe to spend</span>
+                  <span className="stat-label"><Icon name="Shield" /> Safe to spend</span>
                   <span className="stat-value">{fmt(s.safePerDay, { decimals: 0 })}<small>/day</small></span>
                   <span className="stat-sub">{s.safeBasis === 'balance' ? 'from bank balance' : 'until month end'}</span>
                 </div>
               )}
               <button className="stat link" onClick={() => go('planner')}>
-                <span className="stat-label">🪣 Pots</span>
+                <span className="stat-label"><Icon name="PiggyBank" /> Pots</span>
                 <span className="stat-value">{fmt((state.settings.billPot?.balance || 0) + (state.goals || []).reduce((a, g) => a + (g.saved || 0), 0), { decimals: 0 })}</span>
                 <span className="stat-sub">bills {fmt(state.settings.billPot?.balance || 0, { decimals: 0 })}{owed.owedToYou > 0 ? ` · owed to you ${fmt(owed.owedToYou, { decimals: 0 })}` : ''}</span>
               </button>
               <button className="stat link" onClick={() => go('debts')}>
-                <span className="stat-label">💳 Debts</span>
+                <span className="stat-label"><Icon name="CreditCard" /> Debts</span>
                 <span className="stat-value">{fmt(s.debtTotal, { decimals: 0 })}</span>
                 <span className="stat-sub">{s.debtInterest > 0 ? `${fmt(s.debtInterest, { decimals: 0 })}/mo interest` : 'no interest'}</span>
               </button>
@@ -136,11 +137,11 @@ export default function Dashboard({ go }) {
                 {s.byCategory.map((c) => (
                   <div key={c.id} className={`meter ${c.over ? 'over' : ''}`} title={`${c.name}: ${fmt(c.spent)} spent${c.target ? ` of ${fmt(c.target)} ${c.budget ? 'budget' : '(3-month average)'}` : ''}${c.pending ? `, ${fmt(c.pending)} still due` : ''}`}>
                     <Ring value={c.spent} max={c.target || c.spent} size={86} stroke={9} color={c.color} label={c.name}>
-                      <span className="meter-icon" aria-hidden>{c.icon}</span>
+                      <span className="meter-icon"><Icon name={c.icon} size="nav" /></span>
                     </Ring>
                     <div className="meter-name">{c.name}</div>
                     <div className="meter-val">{fmt(c.spent, { decimals: 0 })}{c.target > 0 && <span className="muted"> / {fmt(c.target, { decimals: 0 })}</span>}</div>
-                    {c.over ? <div className="meter-flag">⚠ {fmt(c.spent - c.budget, { decimals: 0 })} over</div>
+                    {c.over ? <div className="meter-flag"><Icon name="TriangleAlert" /> {fmt(c.spent - c.budget, { decimals: 0 })} over</div>
                       : c.pending > 0 ? <div className="meter-due">+{fmt(c.pending, { decimals: 0 })} due</div>
                       : !c.budget && c.target > 0 ? <div className="meter-due">vs usual</div> : null}
                   </div>
@@ -170,9 +171,9 @@ export default function Dashboard({ go }) {
                     <li key={e.key} className="list-row">
                       <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
                       <span className="grow">{e.name}<small className="muted"> · {EVENT_TYPES[e.type].label}{e.compulsory ? ' · compulsory' : ''}</small></span>
-                      <span className={`badge ${e.status}`}>{e.status === 'done' ? '✓ Paid' : e.status === 'assumed' ? 'Not seen' : 'Due'}</span>
-                      <b className={e.amount > 0 ? 'pos' : ''}>{e.estimated && e.status !== 'done' ? '≈ ' : ''}{fmt(e.amount, { sign: true })}{e.estimated && e.status !== 'done' && <small className="edited-tag" title="Amount varies: estimated from your recent payments"> est.</small>}{e.override && <small className="edited-tag" title={e.override.note || 'Edited'}> ✎ edited</small>}</b>
-                      <button className="btn ghost sm" onClick={() => setEditOcc(e)} title={e.amount > 0 ? 'Change the amount or date of this payday' : 'Change this one payment'}>✎ Edit</button>
+                      <span className={`badge ${e.status}`}>{e.status === 'done' ? 'Paid' : e.status === 'assumed' ? 'Not seen' : 'Due'}</span>
+                      <b className={e.amount > 0 ? 'pos' : ''}>{e.estimated && e.status !== 'done' ? '≈ ' : ''}{fmt(e.amount, { sign: true })}{e.estimated && e.status !== 'done' && <small className="edited-tag" title="Amount varies: estimated from your recent payments"> est.</small>}{e.override && <small className="edited-tag" title={e.override.note || 'Edited'}> edited</small>}</b>
+                      <button className="btn ghost sm" onClick={() => setEditOcc(e)} title={e.amount > 0 ? 'Change the amount or date of this payday' : 'Change this one payment'}><Icon name="Pencil" /> Edit</button>
                     </li>
                   ))}
                   {movedAway.map((m) => (
@@ -204,8 +205,8 @@ export default function Dashboard({ go }) {
                     <span className="dot" style={{ background: EVENT_TYPES[e.type].color }} />
                     <span className="grow">{e.name}<small className="muted"> · {weekdayShort(e.date)} {shortDate(e.date)}</small></span>
                     {e.compulsory && <span className="badge must">Must pay</span>}
-                    <b className={e.amount > 0 ? 'pos' : ''}>{e.estimated ? '≈ ' : ''}{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag"> ✎</small>}</b>
-                    <button className="icon-btn" aria-label={`Edit ${e.name} on ${e.date}`} title="Edit this one" onClick={() => setEditOcc(e)}>✎</button>
+                    <b className={e.amount > 0 ? 'pos' : ''}>{e.estimated ? '≈ ' : ''}{fmt(e.amount, { sign: true })}{e.override && <small className="edited-tag"> edited</small>}</b>
+                    <button className="icon-btn" aria-label={`Edit ${e.name} on ${e.date}`} title="Edit this one" onClick={() => setEditOcc(e)}><Icon name="Pencil" /></button>
                   </li>
                 ))}
               </ul>

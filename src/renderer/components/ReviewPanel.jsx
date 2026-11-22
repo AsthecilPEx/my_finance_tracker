@@ -5,6 +5,7 @@ import { openSplits } from '../../engine/split.js';
 import { CategorySelect } from './Forms.jsx';
 import { SettleModal } from './Split.jsx';
 import { PlanChips } from './Cards.jsx';
+import { Icon, PopIcon } from './Icon.jsx';
 
 /** Dashboard panel: questions about your transactions that only you can answer. */
 export default function ReviewPanel() {
@@ -18,14 +19,14 @@ export default function ReviewPanel() {
   return (
     <div className="card review">
       <div className="card-head">
-        <h3>🔔 Needs your attention {total > 0 && <span className="count-badge">{total}</span>}</h3>
+        <h3><PopIcon name="Bell" />Needs your attention {total > 0 && <span className="count-badge">{total}</span>}</h3>
         <span className="muted sm">Quick questions so your numbers stay accurate</span>
       </div>
-      {items.length === 0 ? <p className="empty">✓ All clear. Nothing needs checking right now.</p> : (
+      {items.length === 0 ? <p className="empty"><PopIcon name="CircleCheck" size="lg" /> All clear. Nothing needs checking right now.</p> : (
         <ul className="review-list">
           {items.map((it) => (
             <li key={it.key} className={`review-item ${it.kind}`}>
-              <span className="review-icon" aria-hidden>{it.icon}</span>
+              <span className="review-icon"><Icon name={it.icon} size="nav" /></span>
               <div className="grow">
                 <div className="review-title"><b>{it.title}</b><b className={it.kind === 'money-in' ? 'pos' : ''}>{fmt(it.amount)}</b></div>
                 <div className="muted sm">{it.detail}</div>
@@ -39,7 +40,7 @@ export default function ReviewPanel() {
                   {it.kind === 'money-in' && (
                     <>
                       <button className={`btn sm ${it.suggestTransfer ? 'primary' : 'ghost'}`} onClick={() => review(it.txnIds, 'transfer', 'Marked as a transfer between your accounts')}>Transfer from my account</button>
-                      {it.canSplit && <button className={`btn sm ${!it.suggestTransfer ? 'primary' : 'ghost'}`} onClick={() => setSettle(byId(it.txnIds[0]))}>🤝 Split repayment…</button>}
+                      {it.canSplit && <button className={`btn sm ${!it.suggestTransfer ? 'primary' : 'ghost'}`} onClick={() => setSettle(byId(it.txnIds[0]))}><Icon name="Handshake" /> Split repayment…</button>}
                       <button className="btn ghost sm" onClick={() => review(it.txnIds, 'income_other', 'Counted as income')}>It's income</button>
                       <button className="btn ghost sm" onClick={() => review(it.txnIds, 'income_other', 'Counted as a refund')}>Refund</button>
                     </>

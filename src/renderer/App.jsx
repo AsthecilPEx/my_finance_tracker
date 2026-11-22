@@ -20,20 +20,21 @@ import { APP_VERSION } from '../config.js';
 import { receiptInbox } from '../engine/receipts.js';
 import Settings from './pages/Settings.jsx';
 import { NewAccountPrompt } from './components/Cards.jsx';
+import { Icon } from './components/Icon.jsx';
 
 const PAGES = [
-  { id: 'dashboard', label: 'Dashboard', icon: '◉', Component: Dashboard },
-  { id: 'planner', label: 'Pay Planner', icon: '⇶', Component: Planner },
-  { id: 'insights', label: 'Insights', icon: '✦', Component: Insights },
-  { id: 'receipts', label: 'Receipts', icon: '🧾', Component: Receipts },
-  { id: 'transactions', label: 'Transactions', icon: '≡', Component: Transactions },
-  { id: 'bills', label: 'Bills & Income', icon: '↻', Component: Bills },
-  { id: 'debts', label: 'Debts & Loans', icon: '◔', Component: Debts },
-  { id: 'budgets', label: 'Budgets & Caps', icon: '◎', Component: Budgets },
-  { id: 'ai', label: 'AI Plan', icon: '✧', Component: AIPlan },
-  { id: 'connect', label: 'Bank Sync', icon: '⇅', Component: Connect },
-  { id: 'settings', label: 'Settings', icon: '⚙', Component: Settings },
-  { id: 'help', label: 'Help & feedback', icon: '?', Component: Help },
+  { id: 'dashboard', label: 'Dashboard', icon: 'LayoutDashboard', Component: Dashboard },
+  { id: 'planner', label: 'Pay Planner', icon: 'CalendarRange', Component: Planner },
+  { id: 'insights', label: 'Insights', icon: 'Sparkles', Component: Insights },
+  { id: 'receipts', label: 'Receipts', icon: 'Receipt', Component: Receipts },
+  { id: 'transactions', label: 'Transactions', icon: 'ArrowUpDown', Component: Transactions },
+  { id: 'bills', label: 'Bills & Income', icon: 'Repeat', Component: Bills },
+  { id: 'debts', label: 'Debts & Loans', icon: 'CreditCard', Component: Debts },
+  { id: 'budgets', label: 'Budgets & Caps', icon: 'Gauge', Component: Budgets },
+  { id: 'ai', label: 'AI Plan', icon: 'Bot', Component: AIPlan },
+  { id: 'connect', label: 'Bank Sync', icon: 'RefreshCw', Component: Connect },
+  { id: 'settings', label: 'Settings', icon: 'Settings', Component: Settings },
+  { id: 'help', label: 'Help & feedback', icon: 'CircleHelp', Component: Help },
 ];
 
 export default function App() {
@@ -53,13 +54,13 @@ export default function App() {
         <div className="brand"><span className="brand-dot" />Pulse</div>
         {PAGES.map((p) => (
           <button key={p.id} className={`nav ${page === p.id ? 'active' : ''}`} onClick={() => setPage(p.id)}>
-            <span className="nav-icon" aria-hidden>{p.icon}</span>{p.label}
+            <span className="nav-icon"><Icon name={p.icon} size="nav" /></span>{p.label}
             {p.id === 'receipts' && inboxCount > 0 && <span className="nav-badge" aria-label={`${inboxCount} to itemise`}>{inboxCount}</span>}
           </button>
         ))}
         <div className="sidebar-foot">
           <button className="btn primary block" onClick={() => setAdding(true)}>+ Add transaction</button>
-          {isDesktop && <button className="btn ghost block" onClick={() => api.toggleWidget()}>▣ Desktop widget</button>}
+          {isDesktop && <button className="btn ghost block" onClick={() => api.toggleWidget()}><Icon name="AppWindow" /> Desktop widget</button>}
           {state.settings.demo && <div className="demo-flag">Demo data: reset it in Settings</div>}
           <div className="version">v{APP_VERSION}</div>
         </div>

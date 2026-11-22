@@ -53,7 +53,7 @@ export default function PayEditor({ occ, onClose }) {
   };
 
   return (
-    <Modal title={isPay ? `✎ Edit this payday` : `✎ Edit this payment`} onClose={onClose}>
+    <Modal title={isPay ? 'Edit this payday' : 'Edit this payment'} onClose={onClose}>
       <div className="split-head">
         <b>{occ.name}</b>
         <span className="muted">{weekdayShort(scheduledDate)} {shortDate(scheduledDate)} · normally {fmt(normal)}</span>

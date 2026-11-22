@@ -23,15 +23,15 @@ export function startReminders({ getState, notify, sent }) {
     for (const e of upcoming(state, today, 1)) {
       if (e.type === 'payday' && e.inDays === 0) {
         const pot = plan?.billsShare ? ` Move ${fmt(e.amount * plan.billsShare)} to your bills pot.` : '';
-        once(e.key, `💼 Payday: ${e.name}`, `${fmt(e.amount)} should land today.${pot}`, 'planner');
+        once(e.key, `Payday: ${e.name}`, `${fmt(e.amount)} should land today.${pot}`, 'planner');
       }
       if (e.amount < 0 && e.inDays === 1) once(e.key, `Due tomorrow: ${e.name}`, `${fmt(-e.amount)}${e.compulsory ? ' (compulsory)' : ''}. Make sure there's enough in your account.`, 'bills');
     }
     for (const c of evaluateCaps(state, today)) {
       if (c.status === 'ok') continue;
       const key = `cap:${c.cap.id}:${c.status}:${c.window.from}`;
-      if (c.status === 'near') once(key, `◐ Nearing your cap: ${c.label}`, `${fmt(c.spent)} of ${fmt(c.cap.amount)} ${c.window.label}. ${fmt(c.remaining)} left for ${c.daysLeft} more day${c.daysLeft === 1 ? '' : 's'}.`, 'budgets');
-      else once(key, `⚠ Cap reached: ${c.label}`, `${fmt(c.spent)} spent against a ${fmt(c.cap.amount)} cap ${c.window.label}.`, 'budgets');
+      if (c.status === 'near') once(key, `Nearing your cap: ${c.label}`, `${fmt(c.spent)} of ${fmt(c.cap.amount)} ${c.window.label}. ${fmt(c.remaining)} left for ${c.daysLeft} more day${c.daysLeft === 1 ? '' : 's'}.`, 'budgets');
+      else once(key, `Cap reached: ${c.label}`, `${fmt(c.spent)} spent against a ${fmt(c.cap.amount)} cap ${c.window.label}.`, 'budgets');
     }
     const exp = state.settings.bank?.expires;
     if (state.settings.bank?.connected && exp && exp - Date.now() < 7 * 86400000) {
@@ -39,7 +39,7 @@ export function startReminders({ getState, notify, sent }) {
     }
     for (const o of billsNeedingAmounts(state, today)) {
       const card = o.source === 'debt';
-      once(`amount:${o.key}`, card ? `💳 ${o.name} statement is out` : `🧾 Is your ${o.name} bill out?`, `Due ${o.date}. Pulse is planning ≈ ${fmt(-o.amount)}. Enter the real amount under "Needs your attention" so your plan stays accurate.`, 'dashboard');
+      once(`amount:${o.key}`, card ? `${o.name} statement is out` : `Is your ${o.name} bill out?`, `Due ${o.date}. Pulse is planning ≈ ${fmt(-o.amount)}. Enter the real amount under "Needs your attention" so your plan stays accurate.`, 'dashboard');
     }
     const mz = state.settings.monzo;
     if (mz?.connected && mz.approvedAt && !mz.needsReconnect) {
@@ -53,7 +53,7 @@ export function startReminders({ getState, notify, sent }) {
     }
     for (const s of staleStatements(state, today)) {
       // Once per bank per week of staleness.
-      once(`stale:${s.bank}:${Math.floor(s.days / 7)}`, `📄 Time for a new ${s.name} statement`, `Last imported ${s.days} days ago. ${s.howTo}`, 'connect');
+      once(`stale:${s.bank}:${Math.floor(s.days / 7)}`, `Time for a new ${s.name} statement`, `Last imported ${s.days} days ago. ${s.howTo}`, 'connect');
     }
     for (const [k, d] of Object.entries(log)) if ((Date.parse(today) - Date.parse(d)) / 86400000 > 60) delete log[k];
     sent.set('keys', log);

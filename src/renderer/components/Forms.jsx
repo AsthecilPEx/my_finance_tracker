@@ -52,7 +52,7 @@ export function CategorySelect({ value, onChange, filter }) {
   const list = state.categories.filter(filter || (() => true));
   return (
     <select value={value || ''} onChange={(e) => onChange(e.target.value)}>
-      {list.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+      {list.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
     </select>
   );
 }

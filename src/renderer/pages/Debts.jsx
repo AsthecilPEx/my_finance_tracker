@@ -9,6 +9,7 @@ import { formatMoney } from '../../engine/money.js';
 import { debtPayment } from '../../engine/summary.js';
 import { isCardDebt, isCardEmi, statementFor, closeOnOrBefore, nextClose } from '../../engine/cards.js';
 import { CardForm, EmiForm } from '../components/Cards.jsx';
+import { Icon } from '../components/Icon.jsx';
 
 function payoffDate(today, months) {
   if (!isFinite(months)) return 'Never at this rate';
@@ -54,7 +55,7 @@ export default function Debts() {
 
       {tracked.length > 0 && (
         <>
-          <h2 className="section-title">💳 Credit cards (from their transactions)</h2>
+          <h2 className="section-title"><Icon name="CreditCard" />Credit cards (from their transactions)</h2>
           <div className="debt-grid">
             {tracked.map((c) => {
               const raw = state.debts.find((x) => x.id === c.id);
@@ -66,7 +67,7 @@ export default function Debts() {
                 <div key={c.id} className="card debt">
                   <div className="card-head">
                     <div><h3>{c.name}</h3><span className="muted sm">Statement on the {ordinal(c.statementDay)} · due the {ordinal(c.dueDay)} · {c.payMode === 'minimum' ? 'pays the minimum' : c.payMode === 'fixed' ? `pays ${fmt(c.fixedPayment)}` : 'paid in full'}</span></div>
-                    <div className="row-actions"><button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setEditCard(raw)}>✎</button></div>
+                    <div className="row-actions"><button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setEditCard(raw)}><Icon name="Pencil" /></button></div>
                   </div>
                   {(() => { const onPlans = emis.reduce((t, e) => t + (e.emi?.remaining || 0), 0); return (
                     <div className="debt-bal">{fmt(c.balance + onPlans, { decimals: 0 })}<small className="muted"> owed{onPlans > 0 ? ` · ${fmt(onPlans, { decimals: 0 })} on plans` : ''}</small></div>
@@ -91,7 +92,7 @@ export default function Debts() {
                               </span>
                               <span className="muted sm nowrap">{fmt(st.instalment)}/mo</span>
                               <b className="nowrap">{fmt(st.remaining, { decimals: 0 })} left</b>
-                              {txn && <button className="icon-btn" aria-label={`Edit ${e.name}`} onClick={() => setEditEmi({ txn, plan: state.debts.find((x) => x.id === e.id) })}>✎</button>}
+                              {txn && <button className="icon-btn" aria-label={`Edit ${e.name}`} onClick={() => setEditEmi({ txn, plan: state.debts.find((x) => x.id === e.id) })}><Icon name="Pencil" /></button>}
                             </li>
                           );
                         })}
@@ -117,8 +118,8 @@ export default function Debts() {
                 <div className="card-head">
                   <div><h3>{d.name}</h3><span className="muted sm">{DEBT_TYPES[d.type] || d.type}{d.dueDay ? ` · due on the ${ordinal(d.dueDay)}` : ''}{d.statementDay ? ` · statement on the ${ordinal(d.statementDay)}` : ''}{d.payMode === 'full' ? ' · paid in full' : d.payMode === 'fixed' ? ' · fixed payment' : ''}</span></div>
                   <div className="row-actions">
-                    <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.debts.find((x) => x.id === d.id))}>✎</button>
-                    <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'debt/delete', payload: { id: d.id } })}>🗑</button>
+                    <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.debts.find((x) => x.id === d.id))}><Icon name="Pencil" /></button>
+                    <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'debt/delete', payload: { id: d.id } })}><Icon name="Trash2" /></button>
                   </div>
                 </div>
                 <div className="debt-bal">{d.native ? formatMoney(d.native.balance, d.native.currency, { decimals: 0 }) : fmt(d.balance, { decimals: 0 })}</div>
@@ -152,7 +153,7 @@ export default function Debts() {
               const best = plans.avalanche.totalInterest <= plans.snowball.totalInterest ? 'avalanche' : 'snowball';
               return (
                 <div key={p.key} className={`plan ${best === p.key ? 'best' : ''}`}>
-                  <div className="plan-head"><h4>{p.name}</h4><span>{best === p.key && <span className="badge done">✓ Cheapest</span>} {chosen === p.key ? <span className="badge must">Your plan</span> : <button className="btn ghost sm" onClick={() => dispatch({ type: 'settings/update', payload: { debtPlan: { strategy: p.key, extra } } })}>Use this</button>}</span></div>
+                  <div className="plan-head"><h4>{p.name}</h4><span>{best === p.key && <span className="badge done">Cheapest</span>} {chosen === p.key ? <span className="badge must">Your plan</span> : <button className="btn ghost sm" onClick={() => dispatch({ type: 'settings/update', payload: { debtPlan: { strategy: p.key, extra } } })}>Use this</button>}</span></div>
                   <p className="muted sm">{p.desc}</p>
                   <div className="plan-stats">
                     <div><span>Debt-free</span><b>{payoffDate(today, r.months)}</b></div>
@@ -208,7 +209,7 @@ function CardBill({ card, bill, soFar, openClose }) {
         <p className="callout warn sm">History starts {bill.historyFrom}, so this bill may miss older purchases. Enter the real amount if it differs.</p>
       )}
       <div className="inline-row wrap">
-        <button className="linkish sm" onClick={() => setOpen((x) => !x)}>{open ? '▾' : '▸'} What's in this bill</button>
+        <button className="linkish sm" onClick={() => setOpen((x) => !x)}><Icon name={open ? 'ChevronDown' : 'ChevronRight'} /> What's in this bill</button>
         {bill.entered
           ? <button className="linkish sm" onClick={() => { dispatch({ type: 'occ/reset', payload: { key } }); notify(`Back to the calculated ${fmt(bill.calculated)}`, 'info'); }}>Use Pulse's figure ({fmt(bill.calculated)}) instead</button>
           : <button className="linkish sm" onClick={() => setFix((x) => !x)}>Bill amount is different?</button>}

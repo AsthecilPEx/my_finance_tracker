@@ -10,6 +10,7 @@ import { myAmount, openSplits } from '../../engine/split.js';
 import { formatMoney } from '../../engine/money.js';
 import { cardDebts, emiStatus, planOf } from '../../engine/cards.js';
 import { EmiForm } from '../components/Cards.jsx';
+import { Icon } from '../components/Icon.jsx';
 
 const PAGE = 100;
 
@@ -62,7 +63,7 @@ export default function Transactions({ go }) {
         {accounts.length > 1 && (
           <select value={account} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
             <option value="">All accounts</option>
-            {accounts.map((a) => <option key={a} value={a}>{cards.has(a) ? '💳 ' : ''}{a}</option>)}
+            {accounts.map((a) => <option key={a} value={a}>{a}{cards.has(a) ? ' (card)' : ''}</option>)}
           </select>
         )}
         <select value={month} onChange={(e) => setMonth(e.target.value)}>
@@ -81,7 +82,7 @@ export default function Transactions({ go }) {
                   <td>
                     <button className="linkish" onClick={() => setEdit(t)}>{t.description}</button>
                     {t.source !== 'manual' && <span className="src">{t.source === 'bank' ? 'bank' : t.source === 'demo' ? 'demo' : t.source === 'monzo' ? 'monzo' : 'csv'}</span>}
-                    {cards.has(t.account) && <span className="src card-src" title={`On your ${cards.get(t.account).name} card`}>💳 {cards.get(t.account).name}</span>}
+                    {cards.has(t.account) && <span className="src card-src" title={`On your ${cards.get(t.account).name} card`}><Icon name="CreditCard" /> {cards.get(t.account).name}</span>}
                     {cards.has(t.account) && t.amount < 0 && t.categoryId !== 'transfer' && (
                       <button className={`receipt-btn ${t.emiId ? 'done' : ''}`} onClick={() => setEmiTxn(t)} title={t.emiId ? 'Edit EMI plan' : 'Convert this purchase into monthly instalments'}>
                         {t.emiId && plans.get(t.emiId)
@@ -90,7 +91,7 @@ export default function Transactions({ go }) {
                       </button>
                     )}
                     {t.amount < 0 && ITEMISABLE[t.categoryId] && (
-                      <button className={`receipt-btn ${itemised.has(t.id) ? 'done' : ''}`} onClick={() => setReceipt(t)} title={itemised.has(t.id) ? 'Edit receipt items' : 'Add receipt items'}>🧾 {itemised.has(t.id) ? `${itemised.get(t.id)} items` : 'Itemise'}</button>
+                      <button className={`receipt-btn ${itemised.has(t.id) ? 'done' : ''}`} onClick={() => setReceipt(t)} title={itemised.has(t.id) ? 'Edit receipt items' : 'Add receipt items'}><Icon name="Receipt" /> {itemised.has(t.id) ? `${itemised.get(t.id)} items` : 'Itemise'}</button>
                     )}
                   </td>
                   <td>
@@ -111,10 +112,10 @@ export default function Transactions({ go }) {
                         <span />
                       </label>
                     ) : (t.settles || hasOpenSplits) ? (
-                      <button className={`receipt-btn ${t.settles ? 'done' : ''}`} onClick={() => setSettleTxn(t)} title="Link this money to split payments it pays back">🤝 {t.settles ? 'Linked' : 'Link'}</button>
+                      <button className={`receipt-btn ${t.settles ? 'done' : ''}`} onClick={() => setSettleTxn(t)} title="Link this money to split payments it pays back"><Icon name="Handshake" /> {t.settles ? 'Linked' : 'Link'}</button>
                     ) : null}
                   </td>
-                  <td className="num"><button className="icon-btn danger" title="Delete" aria-label="Delete" onClick={() => dispatch({ type: 'txn/delete', payload: { id: t.id } })}>🗑</button></td>
+                  <td className="num"><button className="icon-btn danger" title="Delete" aria-label="Delete" onClick={() => dispatch({ type: 'txn/delete', payload: { id: t.id } })}><Icon name="Trash2" /></button></td>
                 </tr>
               ))}
             </tbody>

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Icon } from './Icon.jsx';
 
 export default function Modal({ title, onClose, children, wide }) {
   useEffect(() => {
@@ -11,7 +12,7 @@ export default function Modal({ title, onClose, children, wide }) {
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="X" /></button>
         </div>
         {children}
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
+import { Icon } from './Icon.jsx';
 
 /** Shows "Restart to update" once a new version has downloaded in the background. */
 export function useUpdateStatus() {
@@ -17,7 +18,7 @@ export default function UpdateBanner() {
   if (hidden || status?.state !== 'ready') return null;
   return (
     <div className="update-banner" role="status">
-      <span>✨ <b>Pulse {status.available}</b> is ready. Restart to update (takes a few seconds, your data is untouched).</span>
+      <span><Icon name="Sparkles" /> <b>Pulse {status.available}</b> is ready. Restart to update (takes a few seconds, your data is untouched).</span>
       <button className="btn primary sm" onClick={() => api.updates.install()}>Restart now</button>
       <button className="linkish muted sm" onClick={() => setHidden(true)}>Later</button>
     </div>

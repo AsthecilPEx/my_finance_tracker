@@ -110,7 +110,7 @@ export class EnableBankingConnector {
         const url = new URL(req.url, LOCAL_CALLBACK);
         if (url.pathname !== '/callback') { res.writeHead(404); return res.end(); }
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        res.end('<body style="font:16px system-ui;background:#0b0b0f;color:#fff;display:grid;place-items:center;height:100vh;margin:0"><div><h2>✓ Pulse is connected</h2><p>You can close this tab and go back to the app.</p></div></body>');
+        res.end('<body style="font:16px system-ui;background:#0b0b0f;color:#fff;display:grid;place-items:center;height:100vh;margin:0"><div><h2>Pulse is connected</h2><p>You can close this tab and go back to the app.</p></div></body>');
         this.pending?.resolve(url.toString());
       });
       server.on('error', () => resolve(null)); // port busy: user can paste the URL instead

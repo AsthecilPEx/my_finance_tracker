@@ -152,7 +152,7 @@ export class MonzoConnector {
     const server = await this.listen({
       port: MONZO_PORT,
       path: '/monzo/callback',
-      page: donePage('✓ Signed in to Monzo', 'Now open the <b>Monzo app</b> on your phone and approve Pulse Finance. Then go back to Pulse.'),
+      page: donePage('Signed in to Monzo', 'Now open the <b>Monzo app</b> on your phone and approve Pulse Finance. Then go back to Pulse.'),
       onUrl: (u) => resolveUrl(u),
     });
     this.pending = { state, resolve: resolveUrl, reject: rejectWait };

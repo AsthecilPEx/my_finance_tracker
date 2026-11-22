@@ -8,6 +8,7 @@ import { profileSummary, describeSchedule, incomeItems } from '../../engine/inco
 import { financialView } from '../../engine/view.js';
 import { debtPayment } from '../../engine/summary.js';
 import { formatMoney } from '../../engine/money.js';
+import { Icon } from '../components/Icon.jsx';
 
 export default function Bills({ go }) {
   const { state, dispatch, fmt, today, cats, notify } = useApp();
@@ -59,17 +60,17 @@ export default function Bills({ go }) {
 
       {suggestions.length > 0 && (
         <div className="card suggest">
-          <div className="card-head"><h3>✦ Found in your statements</h3><span className="muted sm">These look like regular payments. Track them to see them on your calendar.</span></div>
+          <div className="card-head"><h3><Icon name="Sparkles" />Found in your statements</h3><span className="muted sm">These look like regular payments. Track them to see them on your calendar.</span></div>
           <ul className="list">
             {suggestions.slice(0, 8).map((s) => (
               <li key={s.match + s.direction} className="list-row">
-                <span aria-hidden>{cats[s.categoryId]?.icon}</span>
+                <Icon name={cats[s.categoryId]?.icon} />
                 <span className="grow"><b>{s.name}</b><small className="muted"> · {FREQUENCIES[s.frequency]}{s.frequency === 'monthly' ? ` around the ${ordinal(s.dayOfMonth)}` : ''} · seen {s.count}×</small></span>
                 <span className={`badge ${s.compulsory ? 'must' : 'opt'}`}>{s.direction === 'in' ? 'Income' : s.compulsory ? 'Compulsory' : 'Optional'}</span>
                 {s.variable && <span className="badge opt" title="The amount changes each time. Pulse uses the average of the last 3.">Amount varies</span>}
                 <b className={s.direction === 'in' ? 'pos' : ''}>{s.variable ? '≈ ' : ''}{fmt(s.amount)}</b>
                 <button className="btn sm primary" onClick={() => accept(s)}>Track</button>
-                <button className="icon-btn" aria-label="Dismiss" onClick={() => setDismissed((d) => [...d, s.match])}>✕</button>
+                <button className="icon-btn" aria-label="Dismiss" onClick={() => setDismissed((d) => [...d, s.match])}><Icon name="X" /></button>
               </li>
             ))}
           </ul>
@@ -86,7 +87,7 @@ export default function Bills({ go }) {
                 const next = item ? nextOccurrence(item, today, state.settings.extraHolidays) : null;
                 return (
                   <li key={p.inc.id} className="list-row">
-                    <span aria-hidden>💼</span>
+                    <Icon name="Briefcase" />
                     <span className="grow"><b>{p.inc.name}</b><small className="muted"> · {describeSchedule(p.inc.schedule)}{next ? ` · next ${weekdayShort(next)} ${shortDate(next)}` : ''} · from your pay profile</small></span>
                     <b className="pos">{fmt(p.plannedPerPay)}</b>
                   </li>
@@ -98,7 +99,7 @@ export default function Bills({ go }) {
             <ul className="list">
               {g.items.map((r) => (
                 <li key={r.id} className={`list-row ${active(r) ? '' : 'inactive'}`}>
-                  <span aria-hidden>{cats[r.categoryId]?.icon}</span>
+                  <Icon name={cats[r.categoryId]?.icon} />
                   <span className="grow">
                     <b>{r.name}</b>
                     <small className="muted"> · {FREQUENCIES[r.frequency]}{r.frequency === 'monthly' ? ` on the ${ordinal(r.dayOfMonth)}` : ''}{r.next ? ` · next ${weekdayShort(r.next)} ${shortDate(r.next)}` : ''}</small>
@@ -112,8 +113,8 @@ export default function Bills({ go }) {
                     <input type="checkbox" checked={active(r)} onChange={(e) => dispatch({ type: 'recurring/save', payload: { id: r.id, active: e.target.checked, amount: r.native?.amount ?? r.amount } })} />
                     <span />
                   </label>
-                  <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.recurring.find((x) => x.id === r.id))}>✎</button>
-                  <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'recurring/delete', payload: { id: r.id } })}>🗑</button>
+                  <button className="icon-btn" aria-label="Edit" onClick={() => setEdit(state.recurring.find((x) => x.id === r.id))}><Icon name="Pencil" /></button>
+                  <button className="icon-btn danger" aria-label="Delete" onClick={() => dispatch({ type: 'recurring/delete', payload: { id: r.id } })}><Icon name="Trash2" /></button>
                 </li>
               ))}
             </ul>

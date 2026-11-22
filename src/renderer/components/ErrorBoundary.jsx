@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import { api } from '../api.js';
+import { Icon } from './Icon.jsx';
 
 /** If a screen crashes, show a friendly message with a one-click bug report instead of a blank window. */
 export default class ErrorBoundary extends Component {
@@ -19,7 +20,7 @@ export default class ErrorBoundary extends Component {
     return (
       <div className="crash">
         <div className="crash-card">
-          <div className="crash-icon" aria-hidden>🛠️</div>
+          <div className="crash-icon"><Icon name="Wrench" size="lg" /></div>
           <h2>Something went wrong on this screen</h2>
           <p className="muted">Your data is safe: it's saved on this computer and backed up daily. Reloading usually fixes this.</p>
           <pre className="crash-detail">{String(error.message).slice(0, 300)}</pre>

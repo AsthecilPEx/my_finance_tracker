@@ -4,6 +4,7 @@ import Modal from './Modal.jsx';
 import { Field } from './Forms.jsx';
 import { unclassifiedAccounts, cardDebts, closeOnOrBefore, nextClose, emiSchedule, instalmentFor, isCardDebt, planOf, planApr } from '../../engine/cards.js';
 import { ordinal, todayISO } from '../../engine/dates.js';
+import { Icon } from './Icon.jsx';
 
 // Monzo Flex's options; you pick the one your app is set to.
 const FLEX_PLAN = { mode: 'full', freeMonths: 3, apr: 39, maxMonths: 24, minInstalment: 5, options: [3, 6, 12, 24] };
@@ -221,7 +222,7 @@ export function AccountsList() {
           const kind = card ? 'card' : state.accountTypes?.[acc] || '';
           return (
             <li key={acc} className="list-row">
-              <span aria-hidden>{card ? '💳' : '🏦'}</span>
+              <Icon name={card ? 'CreditCard' : 'Landmark'} />
               <span className="grow"><b>{acc}</b><small className="muted"> · {n} transactions{card ? ` · statement on the ${ordinal(card.statementDay)}, due the ${ordinal(card.dueDay)}` : ''}</small></span>
               <select aria-label={`Type of ${acc}`} value={kind} onChange={(e) => {
                 const v = e.target.value;
