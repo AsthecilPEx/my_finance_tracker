@@ -7,3 +7,9 @@
 - Never use `.gif` files for UI feedback or animations.
 - For interactive micro-animations (bells, checkmarks, toggles, primary CTAs), install and use components from `lucide-animated` (`npx shadcn@latest add "https://lucide-animated.com/r/<icon-name>.json"`), or wrap `lucide-react` icons with `motion/react`.
 - For standard loading spinners, use `Loader2` from `lucide-react` with Tailwind's `animate-spin` class.
+
+## Design
+- For any UI work (new screens, components, layout, colours, typography, icons), load the `apple-design` skill (`.claude/skills/apple-design`) first and follow its guidance.
+- Before finishing a UI change, run an apple-design review of the changed screens and fix anything it flags as a guideline violation.
+- Where the skill and the UI rules above disagree, the rules above win (no emojis; `lucide-react` icons and sizes).
+- Pulse is an Electron + React app for Windows: apply the skill's guidance to web/desktop UI, not SwiftUI.
